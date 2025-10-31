@@ -1,0 +1,36 @@
+{
+    "name": "apc-mini-mk2",
+    "author": "DJj123dj",
+    "version": "1.0.0",
+    "description": "An easy-to-use and feature-rich package for interacting with one or multiple Apc Mini's (Mk2) from Akai Professional.",
+    "main": "dist/index.js",
+    "module": "dist/index.js",
+    "directories": {
+        "test": "test"
+    },
+    "scripts": {
+        "build": "node ./tools/cleanup.js && tsc -p ./tsconfig.json",
+        "test": "node ./test/example.js",
+        "test2": "node ./test/example2.js"
+    },
+    "keywords": [
+        "apc-mini-mk2",
+        "akai-professional",
+        "driver",
+        "advanced",
+        "interaction",
+        "midi",
+        "usb",
+        "auto-connect",
+        "controller",
+        "input-device"
+    ],
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/DJj123dj/apc-mini-mk2.git"
+    },
+    "dependencies": {
+        "easymidi": "^3.1.0"
+    }
+}
