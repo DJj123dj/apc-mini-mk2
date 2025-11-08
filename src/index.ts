@@ -168,6 +168,8 @@ export class APCMiniController {
     #horizontalLightCache: Map<number,Map<number,{id:number,location:number,mode:"off"|"on"|"blink"}>> = new Map()
     /**The cache for all vertical lights of the APC Mini Mk2. */
     #verticalLightCache: Map<number,Map<number,{id:number,location:number,mode:"off"|"on"|"blink"}>> = new Map()
+    /**The bpm on which the lights blink/pulse. `Default: 60` */
+    lightBpm: number
 
     /////////////////////////////
     //// EXTERNAL PROPERTIES ////
@@ -178,20 +180,21 @@ export class APCMiniController {
     /**Enable assigning a controller ID manually by pressing a button instead of choosing it automatically. */
     readonly manualIdAssignmentsEnabled: boolean
     /**The selected actionpad coordinate system. */
-    readonly coordSystem: APCMiniCoordinateSystem
+    readonly coordinates: APCMiniCoordinateSystem
     
     ////////////////////////////
     //// CONSTRUCTOR + INIT ////
     ////////////////////////////
 
-    constructor(maxControllerAmount:number=1,manualIdAssignmentsEnabled:boolean=false,coordSystem:APCMiniCoordinateSystem={xAxis:"left->right",yAxis:"top->bottom"}){
+    constructor(maxControllerAmount:number=1,manualIdAssignmentsEnabled:boolean=false,coordinates:APCMiniCoordinateSystem={xAxis:"left->right",yAxis:"top->bottom"},lightBpm:number=60){
         this.maxControllerAmount = maxControllerAmount
         this.manualIdAssignmentsEnabled = manualIdAssignmentsEnabled
+        this.lightBpm = lightBpm
         
-        if (!coordSystem.xAxis || !coordSystem.yAxis) throw new Error("(APCMiniController) Invalid coordinate system. Expected an {xAxis,yAxis} object.")
-        if (!(["left->right","right->left"].includes(coordSystem.xAxis) && ["top->bottom","bottom->top"].includes(coordSystem.yAxis)) && !(["left->right","right->left"].includes(coordSystem.yAxis) && ["top->bottom","bottom->top"].includes(coordSystem.xAxis))) throw new Error("(APCMiniController) Invalid coordinate system. Expected valid values for each of the {xAxis,yAxis} properties.")
-        this.coordSystem = coordSystem
-        this.#utils = new APCMiniUtils(coordSystem)
+        if (!coordinates.xAxis || !coordinates.yAxis) throw new Error("(APCMiniController) Invalid coordinate system. Expected an {xAxis,yAxis} object.")
+        if (!(["left->right","right->left"].includes(coordinates.xAxis) && ["top->bottom","bottom->top"].includes(coordinates.yAxis)) && !(["left->right","right->left"].includes(coordinates.yAxis) && ["top->bottom","bottom->top"].includes(coordinates.xAxis))) throw new Error("(APCMiniController) Invalid coordinate system. Expected valid values for each of the {xAxis,yAxis} properties.")
+        this.coordinates = coordinates
+        this.#utils = new APCMiniUtils(coordinates)
         this.#autoDisconnectUnusedUnits()
 
         process.on("exit",() => {
@@ -466,7 +469,8 @@ export class APCMiniController {
     }
     /**Render all modes/effects of the RGB lights. */
     #renderConnectedLights(){
-        let i = Date.now() % 2000
+        //timer & BPM
+        let i = Math.round((Date.now()*(this.lightBpm/60)) % 2000)
 
         for (const [id,controllerLights] of this.#rgbLightCache.entries()){
             const pads: {hex:string,midiLocation:number}[] = []
@@ -612,6 +616,10 @@ export class APCMiniController {
     /**Get a list of all used/connected controller ids. */
     listUsedIds(){
         return this.#connections.map((c) => c.id)
+    }
+    /**Set the speed (beats per minute) at which the lights will blink/pulse. */
+    setBpm(bpm:number){
+        this.lightBpm = bpm
     }
 
     ////////////////////////
