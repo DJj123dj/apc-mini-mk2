@@ -14,7 +14,7 @@ interface APCMiniConnection {
     output:easymidi.Output,
     id:number
 }
-/**Available actionpad coordinate systems. */
+/**Available action pad button coordinate systems. */
 type APCMiniCoordinateSystem = {xAxis:"left->right"|"right->left",yAxis:"top->bottom"|"bottom->top"}|{xAxis:"top->bottom"|"bottom->top",yAxis:"left->right"|"right->left"}
 /**A valid hex color for the APC Mini RGB Pads. */
 export type APCMiniHexColor = `#${string}`
@@ -115,11 +115,20 @@ const MODE_MAP = {
  * - Receive slider events.
  * - Manually request button & slider states.
  * - Manually set horizontal, vertical & actionpad RGB lights.
- * - Draw colors, change render modes, apply effects & so much more!
+ * - Create startup/connect animations
+ * - Manage connected APC Mini Mk2's
+ * - Use built-in effects for awesome button lights.
+ * - Change coordinate systems, apply different settings & so much more!
  * 
  * @example
- * const apcMini = new APCMiniController(2,false) //connect up to 2 controllers & automatically assign ID's/locations
+ * //connect up to 2 controllers & automatically assign ID's/locations
+ * const apcMini = new APCMiniController(2,false)
  * 
+ * //connect up to 2 controllers & manually assign ID's/locations
+ * const apcMini2 = new APCMiniController(2,true)
+ * 
+ * //or use a custom coordinate system
+ * const apcMini3 = new APCMiniController(2,true,{xAxis:"left->right",yAxis:"top->bottom"}) 
  */
 export class APCMiniController {
     /////////////////////////////
@@ -166,6 +175,8 @@ export class APCMiniController {
     #horizontalButtonCache: Map<number,Map<number,boolean>> = new Map()
     /**The cache for all vertical button states of the APC Mini Mk2. */
     #verticalButtonCache: Map<number,Map<number,boolean>> = new Map()
+    /**The cache for all slider states of the APC Mini Mk2. */
+    #sliderCache: Map<number,Map<number,number>> = new Map()
     
     /**This function will be called before selecting the id of the controller. It can be used to display a cool animation. */
     #preconnectIntroAnimation: APCMiniPreconnectAnimation|null = null
@@ -738,6 +749,29 @@ export class APCMiniController {
             }
         })
 
+        input.on("cc",(cc) => {
+            const location = cc.controller - 48
+            const value = cc.value
+
+            if (!this.#sliderCache.has(id)) this.#sliderCache.set(id,new Map(new Array(9).fill(0).map((s,i) => ([i,s]))))
+            const sliderMap = this.#sliderCache.get(id)!
+            sliderMap.set(location,value)
+
+            this.#emit("sliderChanged",id,location,value)
+        })
+
+        //get initial slider values (using midi introduction message)
+        input.on("sysex",(sysex) => {
+            const bytes: number[] = sysex.bytes
+            if (bytes[4] !== 0x61) return
+            if (!this.#sliderCache.has(id)) this.#sliderCache.set(id,new Map(new Array(9).fill(0).map((s,i) => ([i,s]))))
+            const controllerMap = this.#sliderCache.get(id)!
+            bytes.slice(7,16).forEach((value,index) => {
+                controllerMap.set(index,value)
+            })
+        })
+        output.send("sysex",[0xF0,0x47,0x7F,0x4F,0x60,0x00,0x04,0x00,0x01,0x00,0x00,0xF7])
+
         //the controller might not be in the 0x00 (default) mode, but in one of the alternative 0x01 (note) or 0x02 (drum) modes.
         //try setting it back to default mode
         output.send("sysex",[0xF0,0x47,0x7F,0x4F,0x62,0x00,0x01,0x00,0xF7])
@@ -831,6 +865,7 @@ export class APCMiniController {
     on(event:"shiftButtonPressed",cb:(controllerId:number) => void): void
     on(event:"shiftButtonReleased",cb:(controllerId:number) => void): void
     on(event:"shiftButtonChanged",cb:(controllerId:number,pressed:boolean) => void): void
+    on(event:"sliderChanged",cb:(controllerId:number,location:number,value:number) => void): void
     /**Listen to an available event. */
     on(event:string,cb:Function): void {
         this.#listeners.push({event,cb})
@@ -850,6 +885,7 @@ export class APCMiniController {
     #emit(event:"shiftButtonPressed",controllerId:number): void
     #emit(event:"shiftButtonReleased",controllerId:number): void
     #emit(event:"shiftButtonChanged",controllerId:number,pressed:boolean): void
+    #emit(event:"sliderChanged",controllerId:number,location:number,value:number): void
     /**Emit an event. */
     #emit(event:string,...args:any[]): void {
         for (const listener of this.#listeners.filter((l) => l.event === event)){
@@ -1015,6 +1051,12 @@ export class APCMiniController {
     getVerticalStates(controllerId:number): boolean[] {
         const controllerMap = this.#verticalButtonCache.get(controllerId)
         if (!controllerMap) return new Array(8).fill(false)
+        return [...controllerMap.values()]
+    }
+    /**Get the current slider values. */
+    getSliderValues(controllerId:number): number[] {
+        const controllerMap = this.#sliderCache.get(controllerId)
+        if (!controllerMap) return new Array(9).fill(0)
         return [...controllerMap.values()]
     }
 
