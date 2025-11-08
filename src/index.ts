@@ -8,24 +8,117 @@ interface APCMiniPreConnection {
 }
 /**A normal connection of an APC Mini mk2 controller. */
 interface APCMiniConnection extends APCMiniPreConnection {
-    id:number,
-    instance:APCMiniInstance
+    id:number
 }
 /**Available actionpad coordinate systems. */
-type APCMiniCoordinateSystem = (
-    "rows_(left->right)_(top->bottom)"|
-    "rows_(right->left)_(top->bottom)"|
-    "rows_(left->right)_(bottom->top)"|
-    "rows_(right->left)_(bottom->top)"|
-    "columns_(left->right)_(top->bottom)"|
-    "columns_(right->left)_(top->bottom)"|
-    "columns_(left->right)_(bottom->top)"|
-    "columns_(right->left)_(bottom->top)"
-)
+type APCMiniCoordinateSystem = {xAxis:"left->right"|"right->left",yAxis:"top->bottom"|"bottom->top"}|{xAxis:"top->bottom"|"bottom->top",yAxis:"left->right"|"right->left"}
+/**A valid hex color for the APC Mini RGB Pads. */
+type APCMiniHexColor = `#${string}`
 /**A mathematical X-Y coordinate. */
 interface APCMiniCoordinates {
     x:number,
     y:number
+}
+/**Available brightness values for the RGB action pads of the APC Mini mk2 controller. */
+type APCMiniBrightnessMode = (
+    "brightness_5"|
+    "brightness_10"|
+    "brightness_20"|
+    "brightness_25"|
+    "brightness_30"|
+    "brightness_40"|
+    "brightness_50"|
+    "brightness_60"|
+    "brightness_70"|
+    "brightness_75"|
+    "brightness_80"|
+    "brightness_90"|
+    "brightness_100"
+)
+/**Available light modes for the RGB action pads of the APC Mini mk2 controller. */
+type APCMiniLightMode = (
+    "static"|
+    "pulsing_1/2"|
+    "pulsing_1/4"|
+    "pulsing_1/8"|
+    "pulsing_1/16"|
+    "blinking_1/2"|
+    "blinking_1/4"|
+    "blinking_1/8"|
+    "blinking_1/16"|
+    "blinking_1/24"|
+    "short_blinking_1/2"|
+    "short_blinking_1/4"|
+    "short_blinking_1/8"|
+    "short_blinking_1/16"|
+    "short_blinking_1/24"|
+    "fade_in_1/2"|
+    "fade_in_1/4"|
+    "fade_in_1/8"|
+    "fade_in_1/16"|
+    "fade_out_1/2"|
+    "fade_out_1/4"|
+    "fade_out_1/8"|
+    "fade_out_1/16"
+)
+type APCMiniLightMode_DEPRECATED = (
+    "brightness_10"|
+    "brightness_25"|
+    "brightness_50"|
+    "brightness_65"|
+    "brightness_75"|
+    "brightness_90"|
+    "brightness_100"|
+    "pulsing_1/2"|
+    "pulsing_1/4"|
+    "pulsing_1/8"|
+    "pulsing_1/16"|
+    "blinking_1/2"|
+    "blinking_1/4"|
+    "blinking_1/8"|
+    "blinking_1/16"|
+    "blinking_1/24"
+)
+
+const BRIGHTNESS_MAP = {
+    "brightness_5":0.05,
+    "brightness_10":0.1,
+    "brightness_20":0.2,
+    "brightness_25":0.25,
+    "brightness_30":0.3,
+    "brightness_40":0.4,
+    "brightness_50":0.5,
+    "brightness_60":0.6,
+    "brightness_70":0.7,
+    "brightness_75":0.75,
+    "brightness_80":0.8,
+    "brightness_90":0.9,
+    "brightness_100":1
+}
+const MODE_MAP = {
+    "static":1,
+    "pulsing_1/2":0.5,
+    "pulsing_1/4":0.25,
+    "pulsing_1/8":0.125,
+    "pulsing_1/16":0.0625,
+    "blinking_1/2":0.5,
+    "blinking_1/4":0.25,
+    "blinking_1/8":0.125,
+    "blinking_1/16":0.0625,
+    "blinking_1/24":0.04167,
+    "short_blinking_1/2":0.5,
+    "short_blinking_1/4":0.25,
+    "short_blinking_1/8":0.125,
+    "short_blinking_1/16":0.0625,
+    "short_blinking_1/24":0.04167,
+    "fade_in_1/2":0.5,
+    "fade_in_1/4":0.25,
+    "fade_in_1/8":0.125,
+    "fade_in_1/16":0.0625,
+    "fade_out_1/2":0.5,
+    "fade_out_1/4":0.25,
+    "fade_out_1/8":0.125,
+    "fade_out_1/16":0.0625
 }
 
 /** ## APCMiniController (`class`)
@@ -57,6 +150,8 @@ export class APCMiniController {
     #disconnectInterval: NodeJS.Timeout|null = null
     /**The interval-id of the auto-connect feature. Should be cleared before exit. */
     #connectInterval: NodeJS.Timeout|null = null
+    /**The interval-id of the lights renderer. Should be cleared before exit. */
+    #renderInterval: NodeJS.Timeout|null = null
     /**A name-list of all active connections.*/
     get #preconnectedNames(){
         return new Set(this.#preconnections.map((c) => c.name))
@@ -65,6 +160,14 @@ export class APCMiniController {
     get #connectedNames(){
         return new Set(this.#connections.map((c) => c.name))
     }
+    /**Utilities for coordinates & colors. */
+    #utils: APCMiniUtils
+    /**The cache for all RGB lights of the APC Mini Mk2. */
+    #rgbLightCache: Map<number,Map<number,{id:number,location:number,color:APCMiniHexColor,mode:APCMiniLightMode}>> = new Map()
+    /**The cache for all horizontal lights of the APC Mini Mk2. */
+    #horizontalLightCache: Map<number,Map<number,{id:number,location:number,mode:"off"|"on"|"blink"}>> = new Map()
+    /**The cache for all vertical lights of the APC Mini Mk2. */
+    #verticalLightCache: Map<number,Map<number,{id:number,location:number,mode:"off"|"on"|"blink"}>> = new Map()
 
     /////////////////////////////
     //// EXTERNAL PROPERTIES ////
@@ -76,15 +179,19 @@ export class APCMiniController {
     readonly manualIdAssignmentsEnabled: boolean
     /**The selected actionpad coordinate system. */
     readonly coordSystem: APCMiniCoordinateSystem
-
+    
     ////////////////////////////
     //// CONSTRUCTOR + INIT ////
     ////////////////////////////
 
-    constructor(maxControllerAmount:number=1,manualIdAssignmentsEnabled:boolean=false,coordSystem:APCMiniCoordinateSystem="rows_(left->right)_(top->bottom)"){
+    constructor(maxControllerAmount:number=1,manualIdAssignmentsEnabled:boolean=false,coordSystem:APCMiniCoordinateSystem={xAxis:"left->right",yAxis:"top->bottom"}){
         this.maxControllerAmount = maxControllerAmount
         this.manualIdAssignmentsEnabled = manualIdAssignmentsEnabled
+        
+        if (!coordSystem.xAxis || !coordSystem.yAxis) throw new Error("(APCMiniController) Invalid coordinate system. Expected an {xAxis,yAxis} object.")
+        if (!(["left->right","right->left"].includes(coordSystem.xAxis) && ["top->bottom","bottom->top"].includes(coordSystem.yAxis)) && !(["left->right","right->left"].includes(coordSystem.yAxis) && ["top->bottom","bottom->top"].includes(coordSystem.xAxis))) throw new Error("(APCMiniController) Invalid coordinate system. Expected valid values for each of the {xAxis,yAxis} properties.")
         this.coordSystem = coordSystem
+        this.#utils = new APCMiniUtils(coordSystem)
         this.#autoDisconnectUnusedUnits()
 
         process.on("exit",() => {
@@ -102,6 +209,12 @@ export class APCMiniController {
             this.#handleShutdown()
             process.exit(0)
         })
+        
+        this.#renderInterval = setInterval(() => {
+            this.#renderConnectedLights()
+            this.#renderHorizontalLights()
+            this.#renderVerticalLights()
+        },50)
     }
 
     ////////////////////////////
@@ -112,6 +225,7 @@ export class APCMiniController {
     #handleShutdown(){
         if (this.#disconnectInterval) clearInterval(this.#disconnectInterval)
         if (this.#connectInterval) clearInterval(this.#connectInterval)
+        if (this.#renderInterval) clearInterval(this.#renderInterval)
 
         for (const name of [...this.#preconnectedNames,...this.#connectedNames]){
             this.#disconnectMidi(name)
@@ -175,10 +289,7 @@ export class APCMiniController {
 
                 const input = new easymidi.Input(name)
                 const output = new easymidi.Output(name)
-                const connection: APCMiniConnection = {
-                    name,id,input,output,
-                    instance:new APCMiniInstance(input,output,id,this)
-                }
+                const connection: APCMiniConnection = {name,id,input,output}
                 this.#connections.push(connection)
                 this.#emit("connect",connection.id,connection.name)
                 this.#preconnections.forEach((c) => this.#renderPreconnectLights(c.output))
@@ -194,7 +305,38 @@ export class APCMiniController {
             //disconnect (in case of normal connection)
             const index = this.#connections.findIndex((c) => c.name === name)
             if (index > -1){
+                //remove from connections
                 const connection = this.#connections.splice(index,1)[0]
+
+                //reset horizontal lights
+                for (let i = 0; i < 8; i++){
+                    connection.output.send("noteon",{
+                        channel:0,
+                        note:i+100,
+                        velocity:0,
+                    })
+                }
+
+                //reset vertical lights
+                for (let i = 0; i < 8; i++){
+                    connection.output.send("noteon",{
+                        channel:0,
+                        note:i+112,
+                        velocity:0,
+                    })
+                }
+
+                //reset RGB Lights
+                let locations: {midiLocation:number,hex:string}[] = []
+                for (let i = 0; i < 64; i++) {locations.push({midiLocation:i,hex:"#000000"})}
+                try{
+                    this.#sendBulkRgbLights(connection.output,locations)
+                }catch(err){
+                    console.error(err)
+                    return false
+                }
+
+                //emit disconnect events
                 connection.input.removeAllListeners()
                 connection.input.close()
                 connection.output.close()
@@ -281,7 +423,141 @@ export class APCMiniController {
             velocity:(reset) ? 0 : 1,
         })
     }
+    #getMidiPortsFromId(id:number){
+        return this.#connections.find((c) => c.id === id) ?? null
+    }
+    /**Split a number to MSB & LSB 7-bit groups */
+    #splitToMsbLsb(x:number){
+        return {msb:(x >> 7) & 0x7f,lsb:(x & 0x7f)}
+    }
+    /**Send a sysex message with bulk RGB pad values. */
+    #sendBulkRgbLights(outputPort:easymidi.Output,pads:{hex:string,midiLocation:number}[]){
+        const splittedPads: {hex:string,midiLocation:number}[][] = []
+        let currentPads: {hex:string,midiLocation:number}[] = []
+        for (const pad of pads){
+            currentPads.push(pad)
+            if (currentPads.length == 32){
+                splittedPads.push(currentPads)
+                currentPads = []
+            }
+        }
+        if (currentPads.length > 0) splittedPads.push(currentPads)
 
+        //split up pads in groups of 32, because bulk messages can send max 32 pads in one message.
+        for (const padGroup of splittedPads){
+            const header: number[] = [0xF0,0x47,0x7F,0x4F,0x24]
+            const padBytes: number[] = []
+
+            for (const {hex,midiLocation} of padGroup){
+                if (!this.#utils.isHexColor(hex)) continue
+                const {red,green,blue} = this.#utils.hexToRgb(hex)
+                const redBytes = this.#splitToMsbLsb(red)
+                const greenBytes = this.#splitToMsbLsb(green)
+                const blueBytes = this.#splitToMsbLsb(blue)
+
+                padBytes.push(midiLocation,midiLocation,redBytes.msb,redBytes.lsb,greenBytes.msb,greenBytes.lsb,blueBytes.msb,blueBytes.lsb)
+            }
+
+            const dataLength = this.#splitToMsbLsb(padBytes.length)
+            const message: number[] = [...header,dataLength.msb,dataLength.lsb,...padBytes,0xF7]
+            outputPort.send("sysex",message)
+        }
+        return true
+    }
+    /**Render all modes/effects of the RGB lights. */
+    #renderConnectedLights(){
+        let i = Date.now() % 2000
+
+        for (const [id,controllerLights] of this.#rgbLightCache.entries()){
+            const pads: {hex:string,midiLocation:number}[] = []
+            const instance = this.#getMidiPortsFromId(id)
+            if (!instance) continue
+            const {input,output} = instance
+            try{
+                //static
+                const staticLights = [...controllerLights.values()].filter((l) => l.mode === "static").map((l) => ({hex:l.color,midiLocation:l.location}))
+                pads.push(...staticLights)
+
+                //blinking
+                const blinkingLights = [...controllerLights.values()].filter((l) => l.mode.startsWith("blinking_")).map((l) => {
+                    const value = MODE_MAP[l.mode]
+                    const newColor = ((i % (4000*value)) < 2000*value) ? l.color : "#000000"
+                    return {hex:newColor,midiLocation:l.location}
+                })
+                pads.push(...blinkingLights)
+
+                //pulsing
+                const pulsingLights = [...controllerLights.values()].filter((l) => l.mode.startsWith("pulsing_")).map((l) => {
+                    const value = MODE_MAP[l.mode]
+                    const multiplier = ((i % (4000*value)) < 2000*value) ? (i % (4000*value))/(2000*value) : 1 - ((i % (4000*value)) - (2000*value))/(2000*value)
+                    const {red,green,blue} = this.#utils.hexToRgb(l.color)
+                    const newColor = this.#utils.rgbToHex(Math.round(red*multiplier),Math.round(green*multiplier),Math.round(blue*multiplier))
+                    
+                    return {hex:newColor,midiLocation:l.location}
+                })
+                pads.push(...pulsingLights)
+
+                //fadeIn
+                const fadeInLights = [...controllerLights.values()].filter((l) => l.mode.startsWith("fade_in_")).map((l) => {
+                    const value = MODE_MAP[l.mode]
+                    const multiplier = ((i % (4000*value)) < 2000*value) ? (i % (4000*value))/(2000*value) : 0
+                    const {red,green,blue} = this.#utils.hexToRgb(l.color)
+                    const newColor = this.#utils.rgbToHex(Math.round(red*multiplier),Math.round(green*multiplier),Math.round(blue*multiplier))
+                    
+                    return {hex:newColor,midiLocation:l.location}
+                })
+                pads.push(...fadeInLights)
+
+                //fadeOut
+                const fadeOutLights = [...controllerLights.values()].filter((l) => l.mode.startsWith("fade_out_")).map((l) => {
+                    const value = MODE_MAP[l.mode]
+                    const multiplier = ((i % (4000*value)) < 2000*value) ? 1 - (i % (4000*value))/(2000*value) : 0
+                    const {red,green,blue} = this.#utils.hexToRgb(l.color)
+                    const newColor = this.#utils.rgbToHex(Math.round(red*multiplier),Math.round(green*multiplier),Math.round(blue*multiplier))
+                    
+                    return {hex:newColor,midiLocation:l.location}
+                })
+                pads.push(...fadeOutLights)
+                
+                //send pad values to APC mini
+                this.#sendBulkRgbLights(output,pads)
+            }catch(err){
+                console.error(err)
+            }
+        }
+    }
+    /**Render all modes/effects of the horizontal lights. */
+    #renderHorizontalLights(){
+        for (const [id,controllerLights] of this.#horizontalLightCache.entries()){
+            const instance = this.#getMidiPortsFromId(id)
+            if (!instance) continue
+            const {input,output} = instance
+            
+            for (const light of [...controllerLights.values()]){
+                output.send("noteon",{
+                    channel:0,
+                    note:light.location+100,
+                    velocity:(light.mode == "off") ? 0 : ((light.mode == "on") ? 1 : 2),
+                })
+            }
+        }
+    }
+    /**Render all modes/effects of the vertical lights. */
+    #renderVerticalLights(){
+        for (const [id,controllerLights] of this.#verticalLightCache.entries()){
+            const instance = this.#getMidiPortsFromId(id)
+            if (!instance) continue
+            const {input,output} = instance
+            
+            for (const light of [...controllerLights.values()]){
+                output.send("noteon",{
+                    channel:0,
+                    note:light.location+112,
+                    velocity:(light.mode == "off") ? 0 : ((light.mode == "on") ? 1 : 2),
+                })
+            }
+        }
+    }
 
     //////////////////////////
     //// PUBLIC FUNCTIONS ////
@@ -302,17 +578,28 @@ export class APCMiniController {
     /**Manually connect an available (apc mini) controller using a name fetched from `listAvailableControllers()`. The ID will be assigned automatically or can be provided manually. This function will throw an error when it fails to connect with the controller. */
     manualConnect(midiName:string,customId?:number){
         if (this.#connectedNames.size < this.maxControllerAmount){
-            if (customId && this.#connections.map((c) => c.id).includes(customId)) throw new Error("(APCMiniController) Failed to connect with controller '"+midiName+"'. The provided ID is already in-use.")
-            if (this.#connections.map((c) => c.name).includes(midiName)) throw new Error("(APCMiniController) Failed to connect with controller '"+midiName+"'. This controller is already connected.")
-            
+            if (customId && this.#connections.map((c) => c.id).includes(customId)){
+                this.#emit("error","(APCMiniController) Failed to connect with controller '"+midiName+"'. The provided ID is already in-use.")
+                return false
+            }
+            if (this.#connections.map((c) => c.name).includes(midiName)){
+                this.#emit("error","(APCMiniController) Failed to connect with controller '"+midiName+"'. This controller is already connected.")
+                return false
+            }
             const connection = this.#connectMidi(midiName,customId)
-            if (!connection) throw new Error("(APCMiniController) Failed to connect with controller '"+midiName+"'.")
+            if (!connection){
+                this.#emit("error","(APCMiniController) Failed to connect with controller '"+midiName+"'.")
+                return false
+            }else return true
         }else throw new Error("(APCMiniController) You can't connect more controllers than the configured 'maxControllerAmount'.")
     }
     /**Manually connect a used (apc mini) controller using a name fetched from `listAvailableControllers()` or using a controller ID from `listUsedIds()`. */
     manualDisconnect(midiNameOrId:string|number){
         const connection = ((typeof midiNameOrId == "string") ? this.#connections.find((c) => c.name == midiNameOrId) : this.#connections.find((c) => c.id == midiNameOrId)) ?? null
-        if (connection) this.#disconnectMidi(connection.name)
+        if (connection){
+            this.#disconnectMidi(connection.name)
+            return true
+        }else return false
     }
     /**Get a list of all unused/available controller names. */
     listAvailableControllers(){
@@ -333,17 +620,143 @@ export class APCMiniController {
 
     on(event:"connect",cb:(id:number,midiName:string) => void): void
     on(event:"disconnect",cb:(id:number,midiName:string) => void): void
+    on(event:"error",cb:(err:string,controllerId?:number) => void): void
     /**Listen to an available event. */
     on(event:string,cb:Function): void {
         this.#listeners.push({event,cb})
     }
     #emit(event:"connect",id:number,midiName:string): void
     #emit(event:"disconnect",id:number,midiName:string): void
+    #emit(event:"error",err:string,controllerId?:number): void
     /**Emit an event. */
     #emit(event:string,...args:any[]): void {
         for (const listener of this.#listeners.filter((l) => l.event === event)){
-            listener.cb(...args)
+            try{
+                listener.cb(...args)
+            }catch(err){
+                if (event !== "error") this.#emit("error",err)
+            }
         }
+    }
+
+    ////////////////////////////
+    //// INSTANCE FUNCTIONS ////
+    ////////////////////////////
+    /**Set the color, brightness & mode of an RGB pad from a certain controller. The color should be in hex-format (e.g. #123abc) */
+    setRgbLights(controllerId:number,positions:(number|APCMiniCoordinates)[]|number|APCMiniCoordinates,brightness:APCMiniBrightnessMode,mode:APCMiniLightMode,color:string){
+        if (controllerId < 0 || (controllerId % 1 !== 0)) return false
+        for (const position of (Array.isArray(positions) ? positions : [positions])){
+            if (typeof position == "number"){
+                if (position < 0 || position > 63 || (position % 1 !== 0)){
+                    this.#emit("error","(APCMiniController) setRgbLight(): Invalid position, must be a value from 0-63",controllerId)
+                    return false
+                }
+            }else{
+                if (typeof position.x !== "number" || typeof position.y !== "number" || (position.x % 1 !== 0) || (position.y % 1 !== 0)){
+                    this.#emit("error","(APCMiniController) setRgbLight(): Invalid position coordinates, expected {x,y} with the value of x,y from 0-7",controllerId)
+                    return false
+                }
+            }
+        }
+        if (!["brightness_5","brightness_10","brightness_20","brightness_25","brightness_30","brightness_40","brightness_50","brightness_60","brightness_70","brightness_75","brightness_80","brightness_90","brightness_100"].includes(brightness)){
+            this.#emit("error","(APCMiniController) setRgbLight(): Please usa a valid light brightness",controllerId)
+            return false
+        }
+        if (!["static","pulsing_1/2","pulsing_1/4","pulsing_1/8","pulsing_1/16","blinking_1/2","blinking_1/4","blinking_1/8","blinking_1/16","blinking_1/24","short_blinking_1/2","short_blinking_1/4","short_blinking_1/8","short_blinking_1/16","short_blinking_1/24","fade_in_1/2","fade_in_1/4","fade_in_1/8","fade_in_1/16","fade_out_1/2","fade_out_1/4","fade_out_1/8","fade_out_1/16"].includes(mode)){
+            this.#emit("error","(APCMiniController) setRgbLight(): Please usa a valid light mode",controllerId)
+            return false
+        }
+        if (!this.#utils.isHexColor(color)){
+            this.#emit("error","(APCMiniController) setRgbLight(): Please usa a valid hex color",controllerId)
+            return false
+        }
+
+        const {red,green,blue} = this.#utils.hexToRgb(color)
+        const multiplier = BRIGHTNESS_MAP[brightness]
+        const newColor = this.#utils.rgbToHex(Math.round(red*multiplier),Math.round(green*multiplier),Math.round(blue*multiplier))
+
+        for (const pos of (Array.isArray(positions) ? positions : [positions])){
+            const virtualCoords = (typeof pos == "number") ? this.#utils.locationToCoordinates(pos) : pos
+            const midiCoords = this.#utils.transformCoordinates(virtualCoords)
+            const midiLocation = this.#utils.coordinatesToLocation(midiCoords)
+
+            if (!this.#rgbLightCache.has(controllerId)) this.#rgbLightCache.set(controllerId,new Map())
+            const controllerMap = this.#rgbLightCache.get(controllerId)!
+            controllerMap.set(midiLocation,{id:controllerId,location:midiLocation,color:newColor,mode:mode})
+        }
+        this.#renderConnectedLights()
+        return true
+    }
+    /**Set the mode of the horizontal (red) lights of the Apc Mini Mk2. Positions go from `0:left` to `7:right` */
+    setHorizontalLights(controllerId:number,positions:number[]|number,mode:"off"|"on"|"blink"){
+        for (const position of (Array.isArray(positions) ? positions : [positions])){
+            
+            if (position < 0 || position > 7 || (position % 1 !== 0)){
+                this.#emit("error","(APCMiniController) setHorizontalLight(): Invalid position, must be a value from 0-7",controllerId)
+                return false
+            }
+        }
+        if (!["off","on","blink"].includes(mode)){
+            this.#emit("error","(APCMiniController) setHorizontalLight(): Invalid light mode, must be 'off', 'on' or 'blink'",controllerId)
+            return false
+        }
+
+        for (const pos of (Array.isArray(positions) ? positions : [positions])){
+            if (!this.#horizontalLightCache.has(controllerId)) this.#horizontalLightCache.set(controllerId,new Map())
+            const controllerMap = this.#horizontalLightCache.get(controllerId)!
+            controllerMap.set(pos,{id:controllerId,location:pos,mode:mode})
+        }
+        this.#renderHorizontalLights()
+        return true
+    }
+    /**Set the mode of the vertical (green) lights of the Apc Mini Mk2. Positions go from `0:top` to `7:bottom` */
+    setVerticalLights(controllerId:number,positions:number[]|number,mode:"off"|"on"|"blink"){
+        for (const position of (Array.isArray(positions) ? positions : [positions])){
+            if (position < 0 || position > 7 || (position % 1 !== 0)){
+                this.#emit("error","(APCMiniController) setVerticalLights(): Invalid position, must be a value from 0-7",controllerId)
+                return false
+            }
+        }
+        if (!["off","on","blink"].includes(mode)){
+            this.#emit("error","(APCMiniController) setVerticalLights(): Invalid light mode, must be 'off', 'on' or 'blink'",controllerId)
+            return false
+        }
+
+        for (const pos of (Array.isArray(positions) ? positions : [positions])){
+            if (!this.#verticalLightCache.has(controllerId)) this.#verticalLightCache.set(controllerId,new Map())
+            const controllerMap = this.#verticalLightCache.get(controllerId)!
+            controllerMap.set(pos,{id:controllerId,location:pos,mode:mode})
+        }
+        this.#renderVerticalLights()
+        return true
+    }
+    /**Clear/turn off all lights from a certain controller (including horizontal & vertical lights). */
+    resetLights(controllerId:number){
+        const instance = this.#getMidiPortsFromId(controllerId)
+        if (!instance) return false
+        
+        let locations: number[] = []
+        for (let i = 0; i < 64; i++){locations.push(i)}
+        try{
+            this.setRgbLights(controllerId,locations,"brightness_100","static","#000000")
+        }catch(err){
+            console.error(err)
+            return false
+        }
+
+        let uiLocations: number[] = []
+        for (let i = 0; i < 8; i++){uiLocations.push(i)}
+        this.setVerticalLights(controllerId,uiLocations,"off")
+        this.setHorizontalLights(controllerId,uiLocations,"off")
+        
+        return true
+    }
+    /**Clear/turn off all lights from all controllers (including horizontal & vertical lights). */
+    resetAllLights(){
+        for (const id of this.listUsedIds()){
+            this.resetLights(id)
+        }
+        return true
     }
 }
 
@@ -489,9 +902,26 @@ class APCMiniUtils {
         this.coordSystem = coordSystem
     }
 
+    /**Check if a certain color is a valid hex color. */
+    isHexColor(hexColor:string): hexColor is APCMiniHexColor {
+        return (/^#[0-9a-fA-F]{6}$/.test(hexColor))
+    }
+    /**Convert a hex color to RGB values (0-255). */
+    hexToRgb(hexColor:APCMiniHexColor){
+        const red = parseInt(hexColor.substring(1,3),16)
+        const green = parseInt(hexColor.substring(3,5),16)
+        const blue = parseInt(hexColor.substring(5,7),16)
+        return {red,green,blue}
+    }
+    /**Convert RGB values (0-255) to a hex color. */
+    rgbToHex(red:number,green:number,blue:number): APCMiniHexColor {
+        const newRed = Math.round(red).toString(16).padStart(2,"0")
+        const newGreen = Math.round(green).toString(16).padStart(2,"0")
+        const newBlue = Math.round(blue).toString(16).padStart(2,"0")
+        return `#${newRed}${newGreen}${newBlue}`
+    }
     /**Get the RGB difference between 2 hex colors. */
-    colorDiff(hex1:string,hex2:string){
-        if (!/^#[0-9a-f]{6}$/.test(hex1) || !/^#[0-9a-f]{6}$/.test(hex2)) throw new Error("(APCMiniUtils) Invalid hex-color.")
+    colorDiff(hex1:APCMiniHexColor,hex2:APCMiniHexColor){
         const red1 = parseInt(hex1.substring(1,3),16)
         const green1 = parseInt(hex1.substring(3,5),16)
         const blue1 = parseInt(hex1.substring(5,7),16)
@@ -513,11 +943,15 @@ class APCMiniUtils {
     }
     /**Get the closest available midi color-value to the provided `hexColor` for the midi controller. */
     getMidiColor(hexColor:string){
-        if (!/^#[0-9a-f]{6}$/.test(hexColor)) throw new Error("(APCMiniUtils) Invalid hex-color.")
-        
+        if (!this.isHexColor(hexColor)) return null
         const differences: {value:number,hex:string,difference:number}[] = []
-        for (const [hex,value] of this.colors.entries()){
-            differences.push({hex,value,difference:this.colorDiff(hexColor,hex).average})
+        
+        for (const [hex,value] of [...this.colors.entries()]){
+            try{
+                if (this.isHexColor(hex)) differences.push({hex,value,difference:this.colorDiff(hexColor,hex).average})
+            }catch(err){
+                console.error(err)
+            }
         }
 
         differences.sort((a,b) => {
@@ -530,7 +964,7 @@ class APCMiniUtils {
     }
     /**Get the closest available midi color-value to the provided `hexColor` for the midi controller. **All colors are dimmed by 85% for darker LEDs**. */
     getDarkMidiColor(hexColor:string){
-        if (!/^#[0-9a-f]{6}$/.test(hexColor)) throw new Error("(APCMiniUtils) Invalid hex-color.")
+        if (!this.isHexColor(hexColor)) return null
 
         const red = parseInt(hexColor.substring(1,3),16)
         const green = parseInt(hexColor.substring(3,5),16)
@@ -545,43 +979,25 @@ class APCMiniUtils {
     /**Transform coordinates between the midi/physical <-> local/virtual coordinate system. */
     transformCoordinates(local:APCMiniCoordinates): APCMiniCoordinates {
         const {x,y} = local
+        const {xAxis,yAxis} = this.coordSystem
         //ROWS
-        if (this.coordSystem == "rows_(left->right)_(bottom->top)") return {x,y}
-        else if (this.coordSystem == "rows_(left->right)_(top->bottom)") return {x,y:7-y}
-        else if (this.coordSystem == "rows_(right->left)_(bottom->top)") return {x:7-x,y}
-        else if (this.coordSystem == "rows_(right->left)_(top->bottom)") return {x:7-x,y:7-y}
+        if (xAxis == "left->right" && yAxis == "bottom->top") return {x,y}
+        else if (xAxis == "left->right" && yAxis == "top->bottom") return {x,y:7-y}
+        else if (xAxis == "right->left" && yAxis == "bottom->top") return {x:7-x,y}
+        else if (xAxis == "right->left" && yAxis == "top->bottom") return {x:7-x,y:7-y}
         //COLUMNS
-        else if (this.coordSystem == "columns_(left->right)_(bottom->top)") return {x:y,y:x}
-        else if (this.coordSystem == "columns_(left->right)_(top->bottom)") return {x:y,y:7-x}
-        else if (this.coordSystem == "columns_(right->left)_(bottom->top)") return {x:7-y,y:x}
-        else if (this.coordSystem == "columns_(right->left)_(top->bottom)") return {x:7-y,y:7-x}
-        else throw new Error("(APCMiniUtils) Invalid coordinate system.")
+        else if (xAxis == "bottom->top" && yAxis == "left->right") return {x:y,y:x}
+        else if (xAxis == "top->bottom" && yAxis == "left->right") return {x:y,y:7-x}
+        else if (xAxis == "bottom->top" && yAxis == "right->left") return {x:7-y,y:x}
+        else if (xAxis == "top->bottom" && yAxis == "right->left") return {x:7-y,y:7-x}
+        else return {x,y:7-y} //left->right, top->bottom
     }
     /**Transform a location ID to X-Y coordinates. */
     locationToCoordinates(location:number): APCMiniCoordinates {
-        return {x:Math.floor(location/8),y:(location % 8)}
+        return {x:(location % 8),y:Math.floor(location/8)}
     }
     /**Transform X-Y coordinates to a location ID. */
     coordinatesToLocation(coordinates:APCMiniCoordinates): number {
-        return (coordinates.x * 8) + coordinates.y
-    }
-}
-
-/** ## APCMiniInstance (`class`)
- * This class is an active instance (& connection) of a single APC Mini Mk2. It's responsible for sending & receiving midi signals to & from this controller.
- */
-class APCMiniInstance {
-    #input: easymidi.Input
-    #output: easymidi.Output
-    #id: number
-    #controller: APCMiniController
-    #utils: APCMiniUtils
-
-    constructor(input:easymidi.Input,output:easymidi.Output,id:number,controller:APCMiniController){
-        this.#input = input
-        this.#output = output
-        this.#id = id
-        this.#controller = controller
-        this.#utils = new APCMiniUtils(controller.coordSystem)
+        return coordinates.x + (coordinates.y * 8)
     }
 }
