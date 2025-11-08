@@ -1,6 +1,6 @@
 const {APCMiniController} = require("../dist/index")
 
-const apcMini = new APCMiniController(4,true,{xAxis:"left->right",yAxis:"top->bottom"})
+const apcMini = new APCMiniController(4,true,{xAxis:"left->right",yAxis:"top->bottom"},60)
 
 console.log("Available units:",apcMini.listAvailableControllers())
 

@@ -170,6 +170,14 @@ export class APCMiniController {
     #verticalLightCache: Map<number,Map<number,{id:number,location:number,mode:"off"|"on"|"blink"}>> = new Map()
     /**The bpm on which the lights blink/pulse. `Default: 60` */
     lightBpm: number
+    /**Is shift pressed for any of the connected controllers? */
+    #shiftPressed: boolean = false
+    /**The cache for all pad button states of the APC Mini Mk2. */
+    #padButtonCache: Map<number,Map<number,boolean>> = new Map()
+    /**The cache for all horizontal button states of the APC Mini Mk2. */
+    #horizontalButtonCache: Map<number,Map<number,boolean>> = new Map()
+    /**The cache for all vertical button states of the APC Mini Mk2. */
+    #verticalButtonCache: Map<number,Map<number,boolean>> = new Map()
 
     /////////////////////////////
     //// EXTERNAL PROPERTIES ////
@@ -294,6 +302,8 @@ export class APCMiniController {
                 const output = new easymidi.Output(name)
                 const connection: APCMiniConnection = {name,id,input,output}
                 this.#connections.push(connection)
+                this.#listenForInputs(connection)
+                output.send("sysex",[0xF0,0x47,0x7F,0x4F,0x62,0x00,0x01,0x00,0xF7])
                 this.#emit("connect",connection.id,connection.name)
                 this.#preconnections.forEach((c) => this.#renderPreconnectLights(c.output))
                 return connection
@@ -310,6 +320,7 @@ export class APCMiniController {
             if (index > -1){
                 //remove from connections
                 const connection = this.#connections.splice(index,1)[0]
+                connection.input.removeAllListeners()
 
                 //reset horizontal lights
                 for (let i = 0; i < 8; i++){
@@ -340,7 +351,6 @@ export class APCMiniController {
                 }
 
                 //emit disconnect events
-                connection.input.removeAllListeners()
                 connection.input.close()
                 connection.output.close()
                 this.#emit("disconnect",connection.id,connection.name)
@@ -426,6 +436,7 @@ export class APCMiniController {
             velocity:(reset) ? 0 : 1,
         })
     }
+    /**Get a connection with midi (input, output) from a controller id. */
     #getMidiPortsFromId(id:number){
         return this.#connections.find((c) => c.id === id) ?? null
     }
@@ -562,6 +573,99 @@ export class APCMiniController {
             }
         }
     }
+    /**Listen for input events (e.g. buttons, shift, sliders, ...) */
+    #listenForInputs(connection:APCMiniConnection){
+        const {id,input,output} = connection
+        input.on("noteon",(note) => {
+            if (note.note >= 0 && note.note < 64){
+                const midiCoords = this.#utils.locationToCoordinates(note.note)
+                const virtualCoords = this.#utils.transformCoordinates(midiCoords)
+                const position = this.#utils.coordinatesToLocation(virtualCoords)
+
+                if (!this.#padButtonCache.has(id)) this.#padButtonCache.set(id,new Map(new Array(64).fill(false).map((b,i) => ([i,b]))))
+                const padMap = this.#padButtonCache.get(id)!
+                padMap.set(position,true)
+                
+                this.#emit("padButtonPressed",id,position,virtualCoords,this.#shiftPressed)
+                this.#emit("padButtonChanged",id,position,virtualCoords,true,this.#shiftPressed)
+
+            }else if (note.note >= 100 && note.note < 108){
+                const position = note.note-100
+
+                if (!this.#horizontalButtonCache.has(id)) this.#horizontalButtonCache.set(id,new Map(new Array(8).fill(false).map((b,i) => ([i,b]))))
+                const horizontalMap = this.#horizontalButtonCache.get(id)!
+                horizontalMap.set(position,true)
+
+                this.#emit("horizontalButtonPressed",id,position,this.#shiftPressed)
+                this.#emit("horizontalButtonChanged",id,position,true,this.#shiftPressed)
+
+            }else if (note.note >= 112 && note.note < 120){
+                const position = note.note-112
+
+                if (!this.#verticalButtonCache.has(id)) this.#verticalButtonCache.set(id,new Map(new Array(8).fill(false).map((b,i) => ([i,b]))))
+                const verticalMap = this.#verticalButtonCache.get(id)!
+                verticalMap.set(position,true)
+
+                this.#emit("verticalButtonPressed",id,position,this.#shiftPressed)
+                this.#emit("verticalButtonChanged",id,position,true,this.#shiftPressed)
+
+            }else if (note.note == 122){
+                this.#shiftPressed = true
+                this.#emit("shiftButtonPressed",id)
+                this.#emit("shiftButtonChanged",id,true)
+            }
+        })
+
+        input.on("noteoff",(note) => {
+            if (note.note >= 0 && note.note < 64){
+                const midiCoords = this.#utils.locationToCoordinates(note.note)
+                const virtualCoords = this.#utils.transformCoordinates(midiCoords)
+                const position = this.#utils.coordinatesToLocation(virtualCoords)
+                
+                if (!this.#padButtonCache.has(id)) this.#padButtonCache.set(id,new Map(new Array(64).fill(false).map((b,i) => ([i,b]))))
+                const padMap = this.#padButtonCache.get(id)!
+                padMap.set(position,false)
+                
+                this.#emit("padButtonReleased",id,position,virtualCoords,this.#shiftPressed)
+                this.#emit("padButtonChanged",id,position,virtualCoords,false,this.#shiftPressed)
+
+            }else if (note.note >= 100 && note.note < 108){
+                const position = note.note-100
+                
+                if (!this.#horizontalButtonCache.has(id)) this.#horizontalButtonCache.set(id,new Map(new Array(8).fill(false).map((b,i) => ([i,b]))))
+                const horizontalMap = this.#horizontalButtonCache.get(id)!
+                horizontalMap.set(position,false)
+
+                this.#emit("horizontalButtonReleased",id,position,this.#shiftPressed)
+                this.#emit("horizontalButtonChanged",id,position,false,this.#shiftPressed)
+
+            }else if (note.note >= 112 && note.note < 120){
+                const position = note.note-112
+
+                if (!this.#verticalButtonCache.has(id)) this.#verticalButtonCache.set(id,new Map(new Array(8).fill(false).map((b,i) => ([i,b]))))
+                const verticalMap = this.#verticalButtonCache.get(id)!
+                verticalMap.set(position,false)
+
+                this.#emit("verticalButtonReleased",id,position,this.#shiftPressed)
+                this.#emit("verticalButtonChanged",id,position,false,this.#shiftPressed)
+
+            }else if (note.note == 122){
+                this.#shiftPressed = false
+                this.#emit("shiftButtonReleased",id)
+                this.#emit("shiftButtonChanged",id,false)
+            }
+        })
+
+        //the controller might not be in the 0x00 (default) mode, but in one of the alternative 0x01 (note) or 0x02 (drum) modes.
+        //try setting it back to default mode
+        output.send("sysex",[0xF0,0x47,0x7F,0x4F,0x62,0x00,0x01,0x00,0xF7])
+        input.on("sysex",(msg) => {
+            if (!this.#utils.compareArrays([0xF0,0x47,0x7F,0x4F,0x62,0x00,0x01,0x00,0xF7],msg.bytes)){
+                
+                output.send("sysex",[0xF0,0x47,0x7F,0x4F,0x62,0x00,0x01,0x00,0xF7])
+            }
+        })
+    }
 
     //////////////////////////
     //// PUBLIC FUNCTIONS ////
@@ -617,6 +721,10 @@ export class APCMiniController {
     listUsedIds(){
         return this.#connections.map((c) => c.id)
     }
+    /**The amount of currently connected controllers. */
+    getConnectedAmount(){
+        return this.#connections.length
+    }
     /**Set the speed (beats per minute) at which the lights will blink/pulse. */
     setBpm(bpm:number){
         this.lightBpm = bpm
@@ -626,16 +734,40 @@ export class APCMiniController {
     //// EVENT HANDLING ////
     ////////////////////////
 
-    on(event:"connect",cb:(id:number,midiName:string) => void): void
-    on(event:"disconnect",cb:(id:number,midiName:string) => void): void
+    on(event:"connect",cb:(controllerId:number,midiName:string) => void): void
+    on(event:"disconnect",cb:(controllerId:number,midiName:string) => void): void
     on(event:"error",cb:(err:string,controllerId?:number) => void): void
+    on(event:"padButtonPressed",cb:(controllerId:number,location:number,coordinates:APCMiniCoordinates,usingShift:boolean) => void): void
+    on(event:"padButtonReleased",cb:(controllerId:number,location:number,coordinates:APCMiniCoordinates,usingShift:boolean) => void): void
+    on(event:"padButtonChanged",cb:(controllerId:number,location:number,coordinates:APCMiniCoordinates,pressed:boolean,usingShift:boolean) => void): void
+    on(event:"horizontalButtonPressed",cb:(controllerId:number,location:number,usingShift:boolean) => void): void
+    on(event:"horizontalButtonReleased",cb:(controllerId:number,location:number,usingShift:boolean) => void): void
+    on(event:"horizontalButtonChanged",cb:(controllerId:number,location:number,pressed:boolean,usingShift:boolean) => void): void
+    on(event:"verticalButtonPressed",cb:(controllerId:number,location:number,usingShift:boolean) => void): void
+    on(event:"verticalButtonReleased",cb:(controllerId:number,location:number,usingShift:boolean) => void): void
+    on(event:"verticalButtonChanged",cb:(controllerId:number,location:number,pressed:boolean,usingShift:boolean) => void): void
+    on(event:"shiftButtonPressed",cb:(controllerId:number) => void): void
+    on(event:"shiftButtonReleased",cb:(controllerId:number) => void): void
+    on(event:"shiftButtonChanged",cb:(controllerId:number,pressed:boolean) => void): void
     /**Listen to an available event. */
     on(event:string,cb:Function): void {
         this.#listeners.push({event,cb})
     }
-    #emit(event:"connect",id:number,midiName:string): void
-    #emit(event:"disconnect",id:number,midiName:string): void
+    #emit(event:"connect",controllerId:number,midiName:string): void
+    #emit(event:"disconnect",controllerId:number,midiName:string): void
     #emit(event:"error",err:string,controllerId?:number): void
+    #emit(event:"padButtonPressed",controllerId:number,location:number,coordinates:APCMiniCoordinates,usingShift:boolean): void
+    #emit(event:"padButtonReleased",controllerId:number,location:number,coordinates:APCMiniCoordinates,usingShift:boolean): void
+    #emit(event:"padButtonChanged",controllerId:number,location:number,coordinates:APCMiniCoordinates,pressed:boolean,usingShift:boolean): void
+    #emit(event:"horizontalButtonPressed",controllerId:number,location:number,usingShift:boolean): void
+    #emit(event:"horizontalButtonReleased",controllerId:number,location:number,usingShift:boolean): void
+    #emit(event:"horizontalButtonChanged",controllerId:number,location:number,pressed:boolean,usingShift:boolean): void
+    #emit(event:"verticalButtonPressed",controllerId:number,location:number,usingShift:boolean): void
+    #emit(event:"verticalButtonReleased",controllerId:number,location:number,usingShift:boolean): void
+    #emit(event:"verticalButtonChanged",controllerId:number,location:number,pressed:boolean,usingShift:boolean): void
+    #emit(event:"shiftButtonPressed",controllerId:number): void
+    #emit(event:"shiftButtonReleased",controllerId:number): void
+    #emit(event:"shiftButtonChanged",controllerId:number,pressed:boolean): void
     /**Emit an event. */
     #emit(event:string,...args:any[]): void {
         for (const listener of this.#listeners.filter((l) => l.event === event)){
@@ -647,9 +779,9 @@ export class APCMiniController {
         }
     }
 
-    ////////////////////////////
-    //// INSTANCE FUNCTIONS ////
-    ////////////////////////////
+    /////////////////////////
+    //// LIGHT FUNCTIONS ////
+    /////////////////////////
     /**Set the color, brightness & mode of an RGB pad from a certain controller. The color should be in hex-format (e.g. #123abc) */
     setRgbLights(controllerId:number,positions:(number|APCMiniCoordinates)[]|number|APCMiniCoordinates,brightness:APCMiniBrightnessMode,mode:APCMiniLightMode,color:string){
         if (controllerId < 0 || (controllerId % 1 !== 0)) return false
@@ -698,7 +830,6 @@ export class APCMiniController {
     /**Set the mode of the horizontal (red) lights of the Apc Mini Mk2. Positions go from `0:left` to `7:right` */
     setHorizontalLights(controllerId:number,positions:number[]|number,mode:"off"|"on"|"blink"){
         for (const position of (Array.isArray(positions) ? positions : [positions])){
-            
             if (position < 0 || position > 7 || (position % 1 !== 0)){
                 this.#emit("error","(APCMiniController) setHorizontalLight(): Invalid position, must be a value from 0-7",controllerId)
                 return false
@@ -740,9 +871,6 @@ export class APCMiniController {
     }
     /**Clear/turn off all lights from a certain controller (including horizontal & vertical lights). */
     resetLights(controllerId:number){
-        const instance = this.#getMidiPortsFromId(controllerId)
-        if (!instance) return false
-        
         let locations: number[] = []
         for (let i = 0; i < 64; i++){locations.push(i)}
         try{
@@ -765,6 +893,47 @@ export class APCMiniController {
             this.resetLights(id)
         }
         return true
+    }
+    /**Fill an RGB pad using a rectangle from from (x,y) to a specific width & height. */
+    fillRgbLights(controllerId:number,startPos:(number|APCMiniCoordinates),width:number,height:number,brightness:APCMiniBrightnessMode,mode:APCMiniLightMode,color:string){
+        const positions: APCMiniCoordinates[] = []
+        const startCoord = (typeof startPos == "number") ? this.#utils.locationToCoordinates(startPos) : startPos
+        for (let x = 0; x < width; x++){
+            const xPos = x+startCoord.x
+            if (xPos < 0 || xPos > 7) continue
+            for (let y = 0; y < height; y++){
+                const yPos = y+startCoord.y
+                if (yPos < 0 || yPos > 7) continue
+                positions.push({x:xPos,y:yPos})
+            }
+        }
+        return this.setRgbLights(controllerId,positions,brightness,mode,color)
+    }
+
+    /////////////////////////
+    //// INPUT FUNCTIONS ////
+    /////////////////////////
+    /**Get the current state of all the shift buttons combined. */
+    getShiftState(): boolean {
+        return this.#shiftPressed
+    }
+    /**Get the current states of the RGB pad buttons. */
+    getPadStates(controllerId:number): boolean[] {
+        const controllerMap = this.#padButtonCache.get(controllerId)
+        if (!controllerMap) return new Array(64).fill(false)
+        return [...controllerMap.values()]
+    }
+    /**Get the current states of the horizontal buttons. */
+    getHorizontalStates(controllerId:number): boolean[] {
+        const controllerMap = this.#horizontalButtonCache.get(controllerId)
+        if (!controllerMap) return new Array(8).fill(false)
+        return [...controllerMap.values()]
+    }
+    /**Get the current states of the vertical buttons. */
+    getVerticalStates(controllerId:number): boolean[] {
+        const controllerMap = this.#verticalButtonCache.get(controllerId)
+        if (!controllerMap) return new Array(8).fill(false)
+        return [...controllerMap.values()]
     }
 }
 
@@ -1008,4 +1177,10 @@ class APCMiniUtils {
     coordinatesToLocation(coordinates:APCMiniCoordinates): number {
         return coordinates.x + (coordinates.y * 8)
     }
+    /**Check if two arrays are the same. */
+    compareArrays(arr1:any[],arr2:any[]): boolean {
+        return (arr1.length === arr2.length && arr1.every((v,i) => v === arr2[i]))
+    }
 }
+
+export default {APCMiniController}
