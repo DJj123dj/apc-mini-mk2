@@ -4,18 +4,22 @@ import easymidi from "easymidi"
 interface APCMiniPreConnection {
     name:string,
     input:easymidi.Input,
-    output:easymidi.Output
+    output:easymidi.Output,
+    animationInterval:NodeJS.Timeout|null
 }
 /**A normal connection of an APC Mini mk2 controller. */
-interface APCMiniConnection extends APCMiniPreConnection {
+interface APCMiniConnection {
+    name:string,
+    input:easymidi.Input,
+    output:easymidi.Output,
     id:number
 }
 /**Available actionpad coordinate systems. */
 type APCMiniCoordinateSystem = {xAxis:"left->right"|"right->left",yAxis:"top->bottom"|"bottom->top"}|{xAxis:"top->bottom"|"bottom->top",yAxis:"left->right"|"right->left"}
 /**A valid hex color for the APC Mini RGB Pads. */
-type APCMiniHexColor = `#${string}`
+export type APCMiniHexColor = `#${string}`
 /**A mathematical X-Y coordinate. */
-interface APCMiniCoordinates {
+export interface APCMiniCoordinates {
     x:number,
     y:number
 }
@@ -61,24 +65,8 @@ type APCMiniLightMode = (
     "fade_out_1/8"|
     "fade_out_1/16"
 )
-type APCMiniLightMode_DEPRECATED = (
-    "brightness_10"|
-    "brightness_25"|
-    "brightness_50"|
-    "brightness_65"|
-    "brightness_75"|
-    "brightness_90"|
-    "brightness_100"|
-    "pulsing_1/2"|
-    "pulsing_1/4"|
-    "pulsing_1/8"|
-    "pulsing_1/16"|
-    "blinking_1/2"|
-    "blinking_1/4"|
-    "blinking_1/8"|
-    "blinking_1/16"|
-    "blinking_1/24"
-)
+/**The callback function for the preconnect animation */
+type APCMiniPreconnectAnimation = (time:number,currentFrame:Map<number,APCMiniHexColor>) => void
 
 const BRIGHTNESS_MAP = {
     "brightness_5":0.05,
@@ -178,6 +166,17 @@ export class APCMiniController {
     #horizontalButtonCache: Map<number,Map<number,boolean>> = new Map()
     /**The cache for all vertical button states of the APC Mini Mk2. */
     #verticalButtonCache: Map<number,Map<number,boolean>> = new Map()
+    
+    /**This function will be called before selecting the id of the controller. It can be used to display a cool animation. */
+    #preconnectIntroAnimation: APCMiniPreconnectAnimation|null = null
+    /**This function will be called while selecting the id of the controller. It can be used to display a cool animation. */
+    #preconnectWaitAnimation: APCMiniPreconnectAnimation|null = null
+    /**This function will be called after selecting the id of the controller. It can be used to display a cool animation. */
+    #preconnectOutroAnimation: APCMiniPreconnectAnimation|null = null
+    /**The duration of the preconnect intro in milliseconds. */
+    #preconnectIntroDuration: number = 1000
+    /**The duration of the preconnect outro in milliseconds. */
+    #preconnectOutroDuration: number = 1000
 
     /////////////////////////////
     //// EXTERNAL PROPERTIES ////
@@ -361,7 +360,18 @@ export class APCMiniController {
             if (preIndex > -1){
                 const preconnection = this.#preconnections.splice(preIndex,1)[0]
                 if (preconnection){
+                    if (preconnection.animationInterval) clearInterval(preconnection.animationInterval)
                     this.#renderPreconnectLights(preconnection.output,true)
+
+                    //reset RGB Lights
+                    let locations: {midiLocation:number,hex:string}[] = []
+                    for (let i = 0; i < 64; i++) {locations.push({midiLocation:i,hex:"#000000"})}
+                    try{
+                        this.#sendBulkRgbLights(preconnection.output,locations)
+                    }catch(err){
+                        console.error(err)
+                        return false
+                    }
 
                     //remove input/output IO & listeners
                     preconnection.input.removeAllListeners()
@@ -378,27 +388,89 @@ export class APCMiniController {
     #startPreconnectIdSelector(name:string){
         if (this.#preconnections.map((c) => c.name).includes(name)) return null
         if (this.#connections.map((c) => c.name).includes(name)) return null
-        const preconnection = {name,input:new easymidi.Input(name),output:new easymidi.Output(name)}
+        const preconnection: APCMiniPreConnection = {name,input:new easymidi.Input(name),output:new easymidi.Output(name),animationInterval:null}
         this.#preconnections.push(preconnection)
+        preconnection.output.send("sysex",[0xF0,0x47,0x7F,0x4F,0x62,0x00,0x01,0x00,0xF7])
         this.#renderPreconnectLights(preconnection.output)
 
+        //intro animation
+        const animationFrame = this.#utils.createAnimationFrame()
+        let startTime = Date.now()
+        let waitTime: number|null = null
+        let outroTime: number|null = null
+        preconnection.animationInterval = setInterval(() => {
+            if (outroTime){
+                //display outro animation
+                const time = (Date.now() - outroTime)
+                if (time < this.#preconnectOutroDuration && this.#preconnectOutroAnimation){
+                    this.#preconnectOutroAnimation(time,animationFrame)
+                    this.#sendBulkRgbLights(preconnection.output,this.#utils.animationFrameToBulkPadColors(animationFrame))
+                }else{
+                    //end animation
+                    if (preconnection.animationInterval) clearInterval(preconnection.animationInterval)
+                    //reset RGB Lights
+                    let locations: {midiLocation:number,hex:string}[] = []
+                    for (let i = 0; i < 64; i++) {locations.push({midiLocation:i,hex:"#000000"})}
+                    try{
+                        this.#sendBulkRgbLights(preconnection.output,locations)
+                    }catch(err){
+                        console.error(err)
+                        return false
+                    }
+                }
+            }else if (waitTime){
+                //display wait animation
+                const time = (Date.now() - waitTime)
+                if (this.#preconnectWaitAnimation){
+                    this.#preconnectWaitAnimation(time,animationFrame)
+                    this.#sendBulkRgbLights(preconnection.output,this.#utils.animationFrameToBulkPadColors(animationFrame))
+                }
+            }else{
+                //display intro animation
+                const time = (Date.now() - startTime)
+                if (time < this.#preconnectIntroDuration && this.#preconnectIntroAnimation){
+                    this.#preconnectIntroAnimation(time,animationFrame)
+                    this.#sendBulkRgbLights(preconnection.output,this.#utils.animationFrameToBulkPadColors(animationFrame))
+                }else{
+                    //go to wait animation
+                    waitTime = Date.now()
+                }
+            }
+        },50)
+
+        
         preconnection.input.on("noteon",(note) => {
             if (note.note > 99 && note.note < 108){
                 const button = note.note-100 //horizontal buttons
                 if (!this.listUsedIds().includes(button) && button < this.maxControllerAmount){
-                    //remove from preconnect list & reset lights
-                    const index = this.#preconnections.findIndex((c) => c.name === name)
-                    if (index < 0) return
-                    this.#preconnections.splice(index,1)
-                    this.#renderPreconnectLights(preconnection.output,true)
+                    outroTime = Date.now()
 
-                    //remove input/output IO & listeners
-                    preconnection.input.removeAllListeners()
-                    preconnection.input.close()
-                    preconnection.output.close()
-                    
-                    //start connection with custom ID
-                    this.#connectMidi(name,button)
+                    //wait until outro animation is finished + 10 extra milliseconds
+                    setTimeout(() => {
+                        //remove from preconnect list & reset lights
+                        const index = this.#preconnections.findIndex((c) => c.name === name)
+                        if (index < 0) return
+                        this.#preconnections.splice(index,1)
+                        this.#renderPreconnectLights(preconnection.output,true)
+
+                        //reset RGB Lights
+                        let locations: {midiLocation:number,hex:string}[] = []
+                        for (let i = 0; i < 64; i++) {locations.push({midiLocation:i,hex:"#000000"})}
+                        try{
+                            this.#sendBulkRgbLights(preconnection.output,locations)
+                        }catch(err){
+                            console.error(err)
+                            return false
+                        }
+
+                        //remove input/output IO & listeners
+                        preconnection.input.removeAllListeners()
+                        preconnection.input.close()
+                        preconnection.output.close()
+                        
+                        //start connection with custom ID
+                        this.#connectMidi(name,button)
+                    },(this.#preconnectOutroAnimation) ? this.#preconnectOutroDuration+10 : 0)
                 }
 
             }else if (note.note > 111 && note.note < 120){
@@ -410,6 +482,16 @@ export class APCMiniController {
                     this.#preconnections.splice(index,1)
                     this.#renderPreconnectLights(preconnection.output,true)
 
+                    //reset RGB Lights
+                    let locations: {midiLocation:number,hex:string}[] = []
+                    for (let i = 0; i < 64; i++) {locations.push({midiLocation:i,hex:"#000000"})}
+                    try{
+                        this.#sendBulkRgbLights(preconnection.output,locations)
+                    }catch(err){
+                        console.error(err)
+                        return false
+                    }
+                    
                     //remove input/output IO & listeners
                     preconnection.input.removeAllListeners()
                     preconnection.input.close()
@@ -935,6 +1017,24 @@ export class APCMiniController {
         if (!controllerMap) return new Array(8).fill(false)
         return [...controllerMap.values()]
     }
+
+    /////////////////////////////
+    //// ANIMATION FUNCTIONS ////
+    /////////////////////////////
+    /**This function will be called before selecting the id of the controller. It can be used to display a cool animation. + The duration of the intro in milliseconds. */
+    setIntroAnimation(animation:APCMiniPreconnectAnimation|null,durationMs:number){
+        this.#preconnectIntroAnimation = animation
+        this.#preconnectIntroDuration = durationMs
+    }
+    /**This function will be called while selecting the id of the controller. It can be used to display a cool animation. */
+    setWaitAnimation(animation:APCMiniPreconnectAnimation|null){
+        this.#preconnectWaitAnimation = animation
+    }
+    /**This function will be called after selecting the id of the controller. It can be used to display a cool animation. + The duration of the outro in milliseconds. */
+    setOutroAnimation(animation:APCMiniPreconnectAnimation|null,durationMs:number){
+        this.#preconnectOutroAnimation = animation
+        this.#preconnectOutroDuration = durationMs
+    }
 }
 
 /** ## APCMiniUtils (`class`)
@@ -1181,6 +1281,52 @@ class APCMiniUtils {
     compareArrays(arr1:any[],arr2:any[]): boolean {
         return (arr1.length === arr2.length && arr1.every((v,i) => v === arr2[i]))
     }
+    /**Create an animation frame used for animating intro/outro's */
+    createAnimationFrame(): Map<number,APCMiniHexColor> {
+        return new Map(new Array(64).fill("#000000").map((b,i) => ([i,b])))
+    }
+    /**Transform an animation frame used for animating intro/outro's to a bulk pad colors list for rendering. */
+    animationFrameToBulkPadColors(frame:Map<number,APCMiniHexColor>){
+        const output: {hex:string,midiLocation:number}[] = [...frame.entries()].map(([pos,color]) => {
+            const virtualCoords = this.locationToCoordinates(pos)
+            const midiCoords = this.transformCoordinates(virtualCoords)
+            const midiLocation = this.coordinatesToLocation(midiCoords)
+            return {hex:color,midiLocation}
+        })
+        return output
+    }
 }
 
-export default {APCMiniController}
+/**Check if a certain color is a valid hex color. */
+export function isHexColor(hexColor:string): hexColor is APCMiniHexColor {
+    return (/^#[0-9a-fA-F]{6}$/.test(hexColor))
+}
+/**Convert a hex color to RGB values (0-255). */
+export function hexToRgb(hexColor:APCMiniHexColor){
+    const red = parseInt(hexColor.substring(1,3),16)
+    const green = parseInt(hexColor.substring(3,5),16)
+    const blue = parseInt(hexColor.substring(5,7),16)
+    return {red,green,blue}
+}
+/**Convert RGB values (0-255) to a hex color. */
+export function rgbToHex(red:number,green:number,blue:number): APCMiniHexColor {
+    const newRed = Math.round(red).toString(16).padStart(2,"0")
+    const newGreen = Math.round(green).toString(16).padStart(2,"0")
+    const newBlue = Math.round(blue).toString(16).padStart(2,"0")
+    return `#${newRed}${newGreen}${newBlue}`
+}
+/**Increase/decrease the brightness using a float from 0-1. */
+export function brightness(multiplier:number,hexColor:APCMiniHexColor){
+    const {red,green,blue} = hexToRgb(hexColor)
+    return rgbToHex(Math.round(red*multiplier),Math.round(green*multiplier),Math.round(blue*multiplier))
+}
+/**Transform a location ID to X-Y coordinates. */
+export function locationToCoordinates(location:number): APCMiniCoordinates {
+    return {x:(location % 8),y:Math.floor(location/8)}
+}
+/**Transform X-Y coordinates to a location ID. */
+export function coordinatesToLocation(coordinates:APCMiniCoordinates): number {
+    return coordinates.x + (coordinates.y * 8)
+}
+
+export default {APCMiniController,isHexColor,hexToRgb,rgbToHex,brightness,locationToCoordinates,coordinatesToLocation}
