@@ -332,6 +332,11 @@ export class APCMiniController {
                 const connection = this.#connections.splice(index,1)[0]
                 connection.input.removeAllListeners()
 
+                //get button inputs (used to reset button inputs)
+                const padMap = this.#padButtonCache.get(connection.id)
+                const horizontalMap = this.#horizontalButtonCache.get(connection.id)
+                const verticalMap = this.#verticalButtonCache.get(connection.id)
+                
                 //reset horizontal lights
                 for (let i = 0; i < 8; i++){
                     connection.output.send("noteon",{
@@ -339,6 +344,13 @@ export class APCMiniController {
                         note:i+100,
                         velocity:0,
                     })
+
+                    //reset horizontal buttons
+                    if (horizontalMap && horizontalMap.get(i)){
+                        horizontalMap.set(i,false)
+                        this.#emit("horizontalButtonReleased",connection.id,i,this.#shiftPressed)
+                        this.#emit("horizontalButtonChanged",connection.id,i,false,this.#shiftPressed)
+                    }
                 }
 
                 //reset vertical lights
@@ -348,11 +360,28 @@ export class APCMiniController {
                         note:i+112,
                         velocity:0,
                     })
+
+                    //reset vertical buttons
+                    if (verticalMap && verticalMap.get(i)){
+                        verticalMap.set(i,false)
+                        this.#emit("verticalButtonReleased",connection.id,i,this.#shiftPressed)
+                        this.#emit("verticalButtonChanged",connection.id,i,false,this.#shiftPressed)
+                    }
                 }
 
                 //reset RGB Lights
                 let locations: {midiLocation:number,hex:string}[] = []
-                for (let i = 0; i < 64; i++) {locations.push({midiLocation:i,hex:"#000000"})}
+                for (let i = 0; i < 64; i++) {
+                    locations.push({midiLocation:i,hex:"#000000"})
+                    
+                    //reset PAD buttons
+                    if (padMap && padMap.get(i)){
+                        padMap.set(i,false)
+                        const virtualCoords = this.#utils.locationToCoordinates(i)
+                        this.#emit("padButtonReleased",connection.id,i,virtualCoords,this.#shiftPressed)
+                        this.#emit("padButtonChanged",connection.id,i,virtualCoords,false,this.#shiftPressed)
+                    }
+                }
                 try{
                     this.#sendBulkRgbLights(connection.output,locations)
                 }catch(err){
