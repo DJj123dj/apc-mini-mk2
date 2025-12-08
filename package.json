@@ -10,7 +10,8 @@
     },
     "scripts": {
         "build": "node ./tools/cleanup.js && tsc -p ./tsconfig.json",
-        "test": "node ./test/example.js"
+        "test": "node ./test/example.js",
+        "test2": "node ./test/example2.js"
     },
     "keywords": [
         "apc-mini-mk2",
