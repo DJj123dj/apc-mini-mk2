@@ -393,7 +393,12 @@ export class APCMiniController {
 
             //remove from ignored names
             this.#ignoredNames.delete(name)
-        }catch(err){}
+
+            return true
+        }catch(err){
+            console.error(err)
+            return false
+        }
     }
     /**Start the pre-connect ID Selector program to manually select an ID for the device by pressing a button. */
     #startPreconnectIdSelector(name:string){
@@ -817,13 +822,20 @@ export class APCMiniController {
             }else return true
         }else throw new Error("(APCMiniController) You can't connect more controllers than the configured 'maxControllerAmount'.")
     }
-    /**Manually connect a used (apc mini) controller using a name fetched from `listAvailableControllers()` or using a controller ID from `listUsedIds()`. */
+    /**Manually disconnect a used (apc mini) controller using a name fetched from `listAvailableControllers()` or using a controller ID from `listUsedIds()`. */
     manualDisconnect(midiNameOrId:string|number){
         const connection = ((typeof midiNameOrId == "string") ? this.#connections.find((c) => c.name == midiNameOrId) : this.#connections.find((c) => c.id == midiNameOrId)) ?? null
         if (connection){
             this.#disconnectMidi(connection.name)
             return true
         }else return false
+    }
+    /**Manually disconnect all used (apc mini) controllers. */
+    manualDisconnectAll(){
+        for (const name of this.#connections.map((c) => c.name)){
+            this.#disconnectMidi(name)
+        }
+        return true
     }
     /**Get a list of all unused/available controller names. */
     listAvailableControllers(){
