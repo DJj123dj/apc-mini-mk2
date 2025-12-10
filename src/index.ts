@@ -849,7 +849,10 @@ export class APCMiniController {
                 this.#emit("error","(APCMiniController) Failed to connect with controller '"+midiName+"'.")
                 return false
             }else return true
-        }else throw new Error("(APCMiniController) You can't connect more controllers than the configured 'maxControllerAmount'.")
+        }else{
+            this.#emit("error","(APCMiniController) You can't connect more controllers than the configured 'maxControllerAmount'. Trying to connect: '"+midiName+"'.")
+            return false
+        }
     }
     /**Manually disconnect a used (apc mini) controller using a name fetched from `listAvailableControllers()` or using a controller ID from `listUsedIds()`. */
     manualDisconnect(midiNameOrId:string|number){

@@ -33,10 +33,10 @@ npm install apc-mini-mk2
 - ✅ **Multi Platform** — Tested on MacOS & Windows. Linux is untested but should work.
 
 ## 📸 Examples
-### TODO TODO TODO
-<!--<img src="https://apis.dj-dj.be/cdn/logbucket/example-marketing.png" width="700px">
-<img src="https://apis.dj-dj.be/cdn/logbucket/example-error.png" width="700px">
-<img src="https://apis.dj-dj.be/cdn/logbucket/example-customisation.png" width="700px">
+> Images will be added to the README soon!
+<!--<img src="https://apis.dj-dj.be/cdn/apc-mini-mk2/example.png" width="700px">
+<img src="https://apis.dj-dj.be/cdn/apc-mini-mk2/example.png" width="700px">
+<img src="https://apis.dj-dj.be/cdn/apc-mini-mk2/example.png" width="700px">
 -->
 
 ## 🛠️ Quick Usage
@@ -102,97 +102,295 @@ console.log("sliders:",apcMini.getSliderValues(0))
 ```
 
 ## 🧩 API Reference
-
-### TODO TODO TODO
 > [View full examples in Github Repository](https://github.com/DJj123dj/logbucket/tree/main/examples)
-<!--
-### function `LogBucket()`: `LogBucketInstance`
-<details>
-<summary>
-Create a Logbucket instance.  
+
+---
+### 📦 Main Class: `APCMiniController`
+This is the main class used to connect, manage and control APC Mini Mk2 devices.  
+Almost all described functions are a method of this class.
+
+> **Construction Parameters:**
+> * **`maxControllerAmount?`** (`number`): Maximum simultaneously connected controllers. *Default: `1`*
+> * **`manualIdAssignmentsEnabled?`** (`boolean`): Require manually selecting device IDs by pressing a horizontal button.
+> * **`coordinates?`** (`APCMiniCoordinateSystem`): Custom coordinate orientation of the 8×8 RGB grid.
+> * **`lightBpm?`** (`number`): BPM used for blinking/pulsing modes. *Default: `60`*
+
+### ✅ Properties
+- (`lightBpm`: `number`) The BPM used for pulsing/blinking light effects.  
+- (`maxControllerAmount`: `number`) Maximum allowed connected APC Mini devices.  
+- (`manualIdAssignmentsEnabled`: `boolean`) Enables manual device ID assignment via pad press during connection.  
+- (`coordinates`: `APCMiniCoordinateSystem`) The coordinate system mapping used for pad grid orientation.  
+
+---
+### 🔌 Connection Management
+#### function `startAutoConnect()`: `void`
+Begins automatically detecting and connecting APC Mini controllers until the max limit is reached.
+
+#### function `stopAutoConnect()`: `void`
+Stops auto-connecting new controllers.
+
+#### function `manualConnect(midiName, customId?)`: `boolean`
+Connects to a specific controller by MIDI name.  
+Returns `false` on failure.
 </summary>
 
-> **Parameters (Optional):**
-> - **`disableDefault?`** (`boolean`): Disable the built-in templates (to replace them with your own)
-> - **`templates?`** (`object`): An object containing additional/custom templates (`LBMessageTemplate`)
-> - **`errTemplate?`** (`LBErrorTemplate`): Add a custom template for logging JS errors (`new Error(...)`)
-> - **`debugFile?`** (`LBDebugFile`): Add a debug file to write all logs to. (Disabled by default)
+> **Parameters:**
+> * **`midiName`** (`string`): Name from `listAvailableControllers()`.
+> * **`customId?`** (`number`): Optional forced ID number.
 </details>
 
-### function `LogBucketInstance()`: `void`
-<details>
-<summary>
-Log messages to the console using a specified log type/category.
-</summary>
+#### function `manualDisconnect(midiNameOrId)`: `boolean`
+Disconnect a controller by MIDI name or ID.  
+Returns `false` on failure.
 
-> **Parameters (Message):**
-> - **`type`** (`string`): The type to use for this message. Must be a custom or default registered type.
-> - **`message`** (`string`): The message to log to the console.
-> - **`params?`** (`LBMessageParam[]`): Add custom parameters to the message.
->   - format: `{key:string, value:string, hidden:boolean}`
->
-> **Parameters (Error):**
-> - **`error`** (`Error`): The error to log to the console.
->
-> **Listen for events:**
-> - Use `LogBucketInstance.on(eventName,callback)` to listen for events.
+> **Parameters:**
+> * **`midiNameOrId`** (`string | number`): The controller name or ID.
 </details>
 
-### class `new LBMessageTemplate()`: `void`
-<details>
-<summary>
-Create a message template to create a custom log type/category.
-</summary>
+#### function `manualDisconnectAll()`: `boolean`
+Disconnects all currently connected controllers.  
+Returns `false` on failure.
 
-> **Constructor Parameters:**
-> - **`prefix`** (`string`): The prefix to use (uppercase recommended)
-> - **`prefixColor`** (`LBDefaultColor|LBHexColor`): The color of the prefix.
-> - **`msgColor`** (`LBDefaultColor|LBHexColor`): The color of the message.
-> - **`paramsColor`** (`LBDefaultColor|LBHexColor`): The color of the parameters.
-</details>
+#### function `listAvailableControllers()`: `string[]`
+Returns all unused / available APC Mini Mk2 device names.
 
-### class `new LBErrorTemplate()`
-<details>
-<summary>
-Create an error template to display the errors differently.
-</summary>
+#### function `listConnectedControllers()`: `string[]`
+Returns all currently connected controller names.
 
-> **Constructor Parameters:**
-> - **`titleColor`** (`LBDefaultColor|LBHexColor`): The color of the title.
-> - **`descriptionColor`** (`LBDefaultColor|LBHexColor`): The color of the description.
-> - **`title?`** (`string`): The title/prefix to use (uppercase recommended)
-> - **`description?`** (`string`): An optional description to display below the error for additional information or bug reporting.
-</details>
+#### function `listUsedIds()`: `number[]`
+Returns all assigned controller IDs.
 
-### class `new LBDebugFile()`
-<details>
-<summary>
-Create a debug file instance to write all logs to.
-</summary>
+#### function `getConnectedAmount()`: `number`
+Returns how many controllers are currently connected.
 
-> **Constructor Parameters:**
-> - **`path`** (`string`): The location of the debug file relative to the current directory. (`process.cwd()`)
-> - **`maxHistoryLength?`** (`number`): The maximum length of the debug file. It will start to scroll once the limit has been reached.
-> - **`metadata?`** (`LBDebugFileMetadata`): Customise the metadata of the debug file. (top of file)
-</details>
+#### function `setBpm(bpm)`: `void`
+Sets the blinking/pulsing BPM for all RGB LED effects.
 
-### type `LBDefaultColor`
-A collection of all available default colors:  
-`white`,`red`,`orange`,`yellow`,`green`,`blue`,`gray`,`cyan`,`magenta`,`purple`,`pink`
+> **Parameters:**
+> * **`bpm`** (`number`): New BPM value.
 
-### type `LBDefaultType`
-A collection of all available log types/categories:  
-`info`,`warning`,`error`,`system`,`database`,`debug`,`plugin`,`api`,`client`,`server`
+---
+### 🎛️ Event Handling
+Each `.on(event, callback)` registers a listener for one of the following events:
 
-### type `LBHexColor`
-A utility type for hex-colors.
+#### event `connect`
+Triggered when a controller successfully connects.
 
-### interface `LBMessageParam`
-A parameter in the `LogBucketInstance(type,message,params)` method.
+> **Callback:** `(controllerId: number, midiName: string) => void`
 
-### interface `LBDebugFileMetadata`
-All settings for the debug file metadata.
--->
+#### event `disconnect`
+Triggered when a controller disconnects.
+
+> **Callback:** `(controllerId: number, midiName: string) => void`
+
+#### event `error`
+Triggered upon connection errors or failures with lights or buttons.  
+If the error is specific to a controller, it will include the ID.
+
+> **Callback:** `(err: string, controllerId?: number) => void`
+
+---
+### 🎛️ Pad Button Events
+
+#### event `padButtonPressed`
+Triggered when one of the 64 pad buttons has been pressed.  
+The location & coordinates correspond to the selected coordinate system.
+
+> **Callback:** `(controllerId: number, location: number, coordinates: APCMiniCoordinates, usingShift: boolean) => void`  
+> Location Values: (`0-63`)
+
+#### event `padButtonReleased`
+Triggered when one of the 64 pad buttons has been released.  
+The location & coordinates correspond to the selected coordinate system.
+
+> **Callback:** `(controllerId: number, location: number, coordinates: APCMiniCoordinates, usingShift: boolean) => void`  
+> Location Values: (`0-63`)
+
+#### event `padButtonChanged`
+Triggered when one of the 64 pad buttons has changed states (pressed/released).  
+The current state of the button is available in the `pressed` parameter.
+
+> **Callback:** `(controllerId: number, location: number, coordinates: APCMiniCoordinates, pressed: boolean, usingShift: boolean) => void`  
+> Location Values: (`0-63`)
+
+---
+### 🎛️ Horizontal/Vertical Button Events
+
+#### event `horizontalButtonPressed` / `verticalButtonPressed`
+Triggered when one of the 8 horizontal or vertical buttons has been pressed.  
+
+> **Callback:** `(controllerId: number, location: number, usingShift: boolean) => void`  
+> Location Values: (`0-7`)
+
+#### event `horizontalButtonReleased` / `verticalButtonReleased`
+Triggered when one of the 8 horizontal or vertical buttons has been released.  
+
+> **Callback:** `(controllerId: number, location: number, usingShift: boolean) => void`  
+> Location Values: (`0-7`)
+
+#### event `horizontalButtonChanged` / `verticalButtonChanged`
+Triggered when one of the 8 horizontal or vertical buttons has changed states (pressed/released).  
+The current state of the button is available in the `pressed` parameter.
+
+> **Callback:** `(controllerId: number, location: number, pressed: boolean, usingShift: boolean) => void`  
+> Location Values: (`0-7`)
+
+
+---
+### 🎛️ Shift Button Events
+
+#### event `shiftButtonPressed`
+Triggered when one of the shift buttons on any controller has been pressed.  
+
+> **Callback:** `(controllerId: number) => void): void`  
+
+#### event `shiftButtonReleased`
+Triggered when one of the shift buttons on any controller has been released.  
+
+> **Callback:** `(controllerId: number) => void): void`  
+
+#### event `shiftButtonChanged`
+Triggered when one of the shift buttons on any controller has changed states (pressed/released).  
+The current state of the button is available in the `pressed` parameter.
+
+> **Callback:** `(controllerId: number, pressed: boolean) => void`  
+
+---
+### 🎛️ Slider Events
+
+#### event `sliderChanged`
+Triggered when one of slider values changes.  
+The current state of the slider is available in the `value` parameter.
+
+> **Callback:** `(controllerId: number, location: number, value: number) => void`  
+> Location: (`0-8`), Value: (`0-127`)
+
+
+---
+### 🌈 RGB & Light Control
+
+#### function `setRgbLights(controllerId, positions, brightness, mode, color)`: `boolean`
+Set RGB pad color, brightness and animation (mode) for one or many pads.
+
+> **Parameters:**
+> * **`controllerId`** (`number`): The Controller ID
+> * **`positions`** (`number|APCMiniCoordinates|Array<...>`): Pads to change.
+> * **`brightness`** (`APCMiniBrightnessMode`): Brightness of the LEDs.
+> * **`mode`** (`APCMiniLightMode`): `static` or one of the available LED Effects.
+> * **`color`** (`string`): Hex color (e.g. `#f8ba00`)
+
+#### function `setHorizontalLights(controllerId, positions, mode)`: `boolean`
+Changes the horizontal (red) button LEDs.
+
+> **Parameters:**
+> * **`positions`** (`number|number[]`): A position from `0–7`.
+> * **`mode`** (`"off"|"on"|"blink"`): The LED effect to apply.
+
+#### function `setVerticalLights(controllerId, positions, mode)`: `boolean`
+Changes the vertical (green) button LEDs.
+
+> **Parameters:**
+> * **`positions`** (`number|number[]`): A position from `0–7`.
+> * **`mode`** (`"off"|"on"|"blink"`): The LED effect to apply.
+
+#### function `resetLights(controllerId)`: `boolean`
+Turns off all lights for a specific controller.
+
+#### function `resetAllLights()`: `boolean`
+Turns off all lights for all controllers.
+
+#### function `fillRgbLights(controllerId, startPos, width, height, brightness, mode, color)`: `boolean`
+Fills a rectangular region of pads with an RGB color/mode.
+
+> **Parameters:**
+> * **`controllerId`** (`number`): The Controller ID
+> * **`startPos`** (`number|APCMiniCoordinates`): Start position.
+> * **`width`** (`number`): Width of the rectangle (follows the coordinate system).
+> * **`height`** (`number`): Height of the rectangle (follows the coordinate system).
+> * **`brightness`** (`APCMiniBrightnessMode`): Brightness of the LEDs.
+> * **`mode`** (`APCMiniLightMode`): `static` or one of the available LED Effects.
+> * **`color`** (`string`): Hex color (e.g. `#f8ba00`)
+
+---
+### 📊 State Polling
+
+#### function `getShiftState()`: `boolean`
+Returns whether any controller has its Shift button pressed.
+
+#### function `getPadStates(controllerId)`: `boolean[]`
+Returns pressed state of all 64 RGB pads.
+
+> **Parameters:**
+> * **`controllerId`** (`number`): The Controller ID
+
+#### function `getHorizontalStates(controllerId)`: `boolean[]`
+Returns state of horizontal buttons.
+
+> **Parameters:**
+> * **`controllerId`** (`number`): The Controller ID
+
+#### function `getVerticalStates(controllerId)`: `boolean[]`
+Returns state of vertical buttons.
+
+> **Parameters:**
+> * **`controllerId`** (`number`): The Controller ID
+
+#### function `getSliderValues(controllerId)`: `number[]`
+Returns slider values (0–127) for the specified controller.
+
+> **Parameters:**
+> * **`controllerId`** (`number`): The Controller ID
+
+---
+### 🎬 Startup / Connection Animations
+All 3 animation methods accept the following callback:  
+`(time: number, currentFrame: Map<padLoc, hexColor>) => void`
+
+> **Parameters:**
+> * **`time`** (`number`): The time since the start of the animation in milliseconds.
+> * **`currentFrame`** (`Map<padLoc,hexColor>`): The current (8x8) animation frame, changes made to this map will update the next frame.
+
+#### function `setIntroAnimation(animation, durationMs)`: `void`
+Sets the animation displayed before the user selects the controller ID.
+
+> **Parameters:**
+> * **`animation`** (`APCMiniPreconnectAnimation | null`)
+> * **`durationMs`** (`number`): The duration of the intro animation.
+
+#### function `setWaitAnimation(animation)`: `void`
+Animation played *while* selecting the controller ID.
+
+> **Parameters:**
+> * **`animation`** (`APCMiniPreconnectAnimation | null`)
+
+#### function `setOutroAnimation(animation, durationMs)`: `void`
+Animation played after controller ID selection is completed.
+
+> **Parameters:**
+> * **`animation`** (`APCMiniPreconnectAnimation | null`)
+> * **`durationMs`** (`number`): The duration of the outro animation.
+
+---
+### 🎨 Utility Functions
+Utility functions are available directly, outside the `APCMiniController` class.
+
+#### function `isHexColor(hexColor)`: `hexColor is APCMiniHexColor`
+Checks if a string is a valid hex color.
+
+#### function `hexToRgb(hexColor)`: `{ red, green, blue }`
+Converts a hex color to 0–255 RGB values.
+
+#### function `rgbToHex(r, g, b)`: `APCMiniHexColor`
+Converts RGB values into a hex color string.
+
+#### function `brightness(multiplier, hexColor)`: `#xxxxxx`
+Modifies brightness of a hex color using a (0–1) multiplier.
+
+#### function `locationToCoordinates(location)`: `APCMiniCoordinates`
+Converts a pad index (0–63) to X-Y coordinates.
+
+#### function `coordinatesToLocation(coordinates)`: `number`
+Converts X-Y coordinates to a pad index (0–63).
 
 ## 🛠️ Contributors
 > All contributions are welcome! Feel free to create a pull-request or issue in the [Github repository](https://github.com/DJj123dj/apc-mini-mk2).
