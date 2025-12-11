@@ -77,7 +77,7 @@ apcMini.on("verticalButtonChanged",(id,location,pressed,shift) => {
     console.log(pressed ? "pressed vertical button:" : "released vertical button:",location,"withShift: "+shift,"controller: "+id)
 })
 apcMini.on("sliderChanged",(id,location,value) => {
-    console.log("slider",location,value)
+    console.log("slider",location,value,"controller: "+id)
 })
 
 console.log("horizontal buttons:",apcMini.getHorizontalStates(0))
