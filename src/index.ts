@@ -258,7 +258,7 @@ export class APCMiniController {
         const outputs = easymidi.getOutputs()
         const sharedPorts = inputs.filter((input) => outputs.includes(input))
 
-        const apcMinis = process.platform == "darwin" ? sharedPorts.filter((p) => p.toLowerCase().startsWith("apc mini mk2 control")) : sharedPorts.filter((p) => p.toLowerCase().startsWith("apc mini mk2"))
+        const apcMinis = process.platform == "darwin" ? sharedPorts.filter((p) => p.toLowerCase().startsWith("apc mini mk2") && p.toLowerCase().endsWith("control")) : sharedPorts.filter((p) => p.toLowerCase().startsWith("apc mini mk2"))
         const availableApcMinis = apcMinis.filter((apc) => !this.#connectedNames.has(apc) && !this.#preconnectedNames.has(apc) && !this.#ignoredNames.has(apc))
         return {all:apcMinis,available:availableApcMinis}
     }
