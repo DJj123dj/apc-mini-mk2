@@ -15,7 +15,7 @@ interface APCMiniConnection {
     id:number
 }
 /**Available action pad button coordinate systems. */
-type APCMiniCoordinateSystem = {xAxis:"left->right"|"right->left",yAxis:"top->bottom"|"bottom->top"}|{xAxis:"top->bottom"|"bottom->top",yAxis:"left->right"|"right->left"}
+export type APCMiniCoordinateSystem = {xAxis:"left->right"|"right->left",yAxis:"top->bottom"|"bottom->top"}|{xAxis:"top->bottom"|"bottom->top",yAxis:"left->right"|"right->left"}
 /**A valid hex color for the APC Mini RGB Pads. */
 export type APCMiniHexColor = `#${string}`
 /**A mathematical X-Y coordinate. */
@@ -24,7 +24,7 @@ export interface APCMiniCoordinates {
     y:number
 }
 /**Available brightness values for the RGB action pads of the APC Mini mk2 controller. */
-type APCMiniBrightnessMode = (
+export type APCMiniBrightnessMode = (
     "brightness_5"|
     "brightness_10"|
     "brightness_20"|
@@ -40,7 +40,7 @@ type APCMiniBrightnessMode = (
     "brightness_100"
 )
 /**Available light modes for the RGB action pads of the APC Mini mk2 controller. */
-type APCMiniLightMode = (
+export type APCMiniLightMode = (
     "static"|
     "pulsing_1/2"|
     "pulsing_1/4"|
@@ -66,7 +66,7 @@ type APCMiniLightMode = (
     "fade_out_1/16"
 )
 /**The callback function for the preconnect animation */
-type APCMiniPreconnectAnimation = (time:number,currentFrame:Map<number,APCMiniHexColor>) => void
+export type APCMiniPreconnectAnimation = (time:number,currentFrame:Map<number,APCMiniHexColor>) => void
 
 const BRIGHTNESS_MAP = {
     "brightness_5":0.05,
