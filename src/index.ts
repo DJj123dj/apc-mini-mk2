@@ -706,7 +706,7 @@ export class APCMiniController {
         input.on("noteon",(note) => {
             if (note.note >= 0 && note.note < 64){
                 const midiCoords = this.#utils.locationToCoordinates(note.note)
-                const virtualCoords = this.#utils.transformCoordinates(midiCoords)
+                const virtualCoords = this.#utils.transformToVirtualCoordinates(midiCoords)
                 const position = this.#utils.coordinatesToLocation(virtualCoords)
 
                 if (!this.#padButtonCache.has(id)) this.#padButtonCache.set(id,new Map(new Array(64).fill(false).map((b,i) => ([i,b]))))
@@ -746,7 +746,7 @@ export class APCMiniController {
         input.on("noteoff",(note) => {
             if (note.note >= 0 && note.note < 64){
                 const midiCoords = this.#utils.locationToCoordinates(note.note)
-                const virtualCoords = this.#utils.transformCoordinates(midiCoords)
+                const virtualCoords = this.#utils.transformToVirtualCoordinates(midiCoords)
                 const position = this.#utils.coordinatesToLocation(virtualCoords)
                 
                 if (!this.#padButtonCache.has(id)) this.#padButtonCache.set(id,new Map(new Array(64).fill(false).map((b,i) => ([i,b]))))
@@ -979,7 +979,7 @@ export class APCMiniController {
 
         for (const pos of (Array.isArray(positions) ? positions : [positions])){
             const virtualCoords = (typeof pos == "number") ? this.#utils.locationToCoordinates(pos) : pos
-            const midiCoords = this.#utils.transformCoordinates(virtualCoords)
+            const midiCoords = this.#utils.transformToMidiCoordinates(virtualCoords)
             const midiLocation = this.#utils.coordinatesToLocation(midiCoords)
 
             if (!this.#rgbLightCache.has(controllerId)) this.#rgbLightCache.set(controllerId,new Map())
@@ -1339,9 +1339,9 @@ class APCMiniUtils {
 
         return this.getMidiColor(`#${newRed}${newGreen}${newBlue}`)
     }
-    /**Transform coordinates between the midi/physical <-> local/virtual coordinate system. */
-    transformCoordinates(local:APCMiniCoordinates): APCMiniCoordinates {
-        const {x,y} = local
+    /**Transform coordinates between the midi/physical <-- local/virtual coordinate system. */
+    transformToMidiCoordinates(virtual:APCMiniCoordinates): APCMiniCoordinates {
+        const {x,y} = virtual
         const {xAxis,yAxis} = this.coordSystem
         //ROWS
         if (xAxis == "left->right" && yAxis == "bottom->top") return {x,y}
@@ -1352,6 +1352,22 @@ class APCMiniUtils {
         else if (xAxis == "bottom->top" && yAxis == "left->right") return {x:y,y:x}
         else if (xAxis == "top->bottom" && yAxis == "left->right") return {x:y,y:7-x}
         else if (xAxis == "bottom->top" && yAxis == "right->left") return {x:7-y,y:x}
+        else if (xAxis == "top->bottom" && yAxis == "right->left") return {x:7-y,y:7-x}
+        else return {x,y:7-y} //left->right, top->bottom
+    }
+    /**Transform coordinates between the midi/physical --> local/virtual coordinate system. */
+    transformToVirtualCoordinates(midi:APCMiniCoordinates): APCMiniCoordinates {
+        const {x,y} = midi
+        const {xAxis,yAxis} = this.coordSystem
+        //ROWS
+        if (xAxis == "left->right" && yAxis == "bottom->top") return {x,y}
+        else if (xAxis == "left->right" && yAxis == "top->bottom") return {x,y:7-y}
+        else if (xAxis == "right->left" && yAxis == "bottom->top") return {x:7-x,y}
+        else if (xAxis == "right->left" && yAxis == "top->bottom") return {x:7-x,y:7-y}
+        //COLUMNS
+        else if (xAxis == "bottom->top" && yAxis == "left->right") return {x:y,y:x}
+        else if (xAxis == "top->bottom" && yAxis == "left->right") return {x:7-y,y:x}
+        else if (xAxis == "bottom->top" && yAxis == "right->left") return {x:y,y:7-x}
         else if (xAxis == "top->bottom" && yAxis == "right->left") return {x:7-y,y:7-x}
         else return {x,y:7-y} //left->right, top->bottom
     }
@@ -1375,7 +1391,7 @@ class APCMiniUtils {
     animationFrameToBulkPadColors(frame:Map<number,APCMiniHexColor>){
         const output: {hex:string,midiLocation:number}[] = [...frame.entries()].map(([pos,color]) => {
             const virtualCoords = this.locationToCoordinates(pos)
-            const midiCoords = this.transformCoordinates(virtualCoords)
+            const midiCoords = this.transformToMidiCoordinates(virtualCoords)
             const midiLocation = this.coordinatesToLocation(midiCoords)
             return {hex:color,midiLocation}
         })

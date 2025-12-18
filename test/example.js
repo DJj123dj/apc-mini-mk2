@@ -53,6 +53,8 @@ apcMini.setRgbLights(1,[{x:3,y:3}],"brightness_100","fade_out_1/8","#0000ff")
 apcMini.setRgbLights(1,[{x:4,y:3}],"brightness_100","fade_out_1/16","#0000ff")
 
 apcMini.setRgbLights(1,[63],"brightness_100","static","#808080")
+apcMini.setRgbLights(0,[61],"brightness_100","static","#ff0000")
+apcMini.setRgbLights(0,[63],"brightness_100","static","#ff0000")
 
 // PANEL 0,1 HORIZONTAL/VERTICAL LIGHTS
 apcMini.setHorizontalLights(0,[0,2,3,6],"blink")

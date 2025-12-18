@@ -1,7 +1,7 @@
 {
     "name": "apc-mini-mk2",
     "author": "DJj123dj",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "description": "An easy-to-use and feature-rich package for interacting with one or multiple Apc Mini's (Mk2) from Akai Professional.",
     "main": "dist/index.js",
     "module": "dist/index.js",
