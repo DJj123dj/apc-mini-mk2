@@ -1,6 +1,6 @@
 <img src="https://apis.dj-dj.be/cdn/apc-mini-mk2/logo.png" alt="Apc Mini Mk2 Logo" width="300px">
 
-[![discord](https://img.shields.io/badge/discord-join%20our%20server-5865F2.svg?style=flat-square&logo=discord)](https://discord.com/invite/26vT9wt3n3)  [![version](https://img.shields.io/badge/version-1.0.3-brightgreen.svg?style=flat-square)](https://github.com/DJj123dj/apc-mini-mk2/releases/tag/v1.0.3)  [![license](https://img.shields.io/badge/license-MIT-important.svg?style=flat-square)](https://github.com/DJj123dj/logbucket/blob/main/LICENSE) [![stars](https://img.shields.io/github/stars/DJj123dj/apc-mini-mk2?color=yellow&label=stars&logo=github&style=flat-square)](https://www.github.com/DJj123dj/apc-mini-mk2)
+[![discord](https://img.shields.io/badge/discord-join%20our%20server-5865F2.svg?style=flat-square&logo=discord)](https://discord.com/invite/26vT9wt3n3)  [![version](https://img.shields.io/badge/version-1.0.3-brightgreen.svg?style=flat-square)](https://github.com/DJj123dj/apc-mini-mk2/releases/tag/v1.0.3)  [![license](https://img.shields.io/badge/license-MIT-important.svg?style=flat-square)](https://github.com/DJj123dj/apc-mini-mk2/blob/main/LICENSE) [![stars](https://img.shields.io/github/stars/DJj123dj/apc-mini-mk2?color=yellow&label=stars&logo=github&style=flat-square)](https://www.github.com/DJj123dj/apc-mini-mk2)
 
 ### Akai APC Mini Mk2
 An easy-to-use and feature-rich Node.js package for interacting with one or multiple Apc Mini's (Mk2) from Akai Professional.
@@ -9,7 +9,7 @@ Perfect for scripts, Electron apps, automation, smart home, music production, ga
 
 Need help? Feel free to join our [support server](https://discord.dj-dj.be) and we will help you fruther!
 
-### [Installation using npm ⬇️](https://www.npmjs.com/package/logbucket)
+### [Installation using npm ⬇️](https://www.npmjs.com/package/apc-mini-mk2)
 ```
 npm install apc-mini-mk2
 ```
@@ -40,7 +40,7 @@ npm install apc-mini-mk2
 -->
 
 ## 🛠️ Quick Usage
-> **TIP:** Detailed examples are available in the `./examples/` directory in the [Github repository](https://github.com/DJj123dj/logbucket/tree/main/examples).
+> **TIP:** Detailed examples are available in the `./examples/` directory in the [Github repository](https://github.com/DJj123dj/apc-mini-mk2/tree/main/examples).
 ```ts
 const {APCMiniController,rgbToHex,hexToRgb} = require("apc-mini-mk2")
 //import {APCMiniController,rgbToHex,hexToRgb} from "apc-mini-mk2"
@@ -102,7 +102,7 @@ console.log("sliders:",apcMini.getSliderValues(0))
 ```
 
 ## 🧩 API Reference
-> [View full examples in Github Repository](https://github.com/DJj123dj/logbucket/tree/main/examples)
+> [View full examples in Github Repository](https://github.com/DJj123dj/apc-mini-mk2/tree/main/examples)
 
 ---
 ### 📦 Main Class: `APCMiniController`
