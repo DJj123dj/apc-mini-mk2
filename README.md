@@ -1,6 +1,6 @@
 <img src="https://apis.dj-dj.be/cdn/apc-mini-mk2/logo.png" alt="Apc Mini Mk2 Logo" width="300px">
 
-[![discord](https://img.shields.io/badge/discord-join%20our%20server-5865F2.svg?style=flat-square&logo=discord)](https://discord.com/invite/26vT9wt3n3)  [![version](https://img.shields.io/badge/version-1.0.3-brightgreen.svg?style=flat-square)](https://github.com/DJj123dj/apc-mini-mk2/releases/tag/v1.0.3)  [![license](https://img.shields.io/badge/license-MIT-important.svg?style=flat-square)](https://github.com/DJj123dj/apc-mini-mk2/blob/main/LICENSE) [![stars](https://img.shields.io/github/stars/DJj123dj/apc-mini-mk2?color=yellow&label=stars&logo=github&style=flat-square)](https://www.github.com/DJj123dj/apc-mini-mk2)
+[![discord](https://img.shields.io/badge/discord-join%20our%20server-5865F2.svg?style=flat-square&logo=discord)](https://discord.com/invite/26vT9wt3n3)  [![version](https://img.shields.io/badge/version-2.0.0-brightgreen.svg?style=flat-square)](https://github.com/DJj123dj/apc-mini-mk2/releases/tag/v2.0.0)  [![license](https://img.shields.io/badge/license-MIT-important.svg?style=flat-square)](https://github.com/DJj123dj/apc-mini-mk2/blob/main/LICENSE) [![stars](https://img.shields.io/github/stars/DJj123dj/apc-mini-mk2?color=yellow&label=stars&logo=github&style=flat-square)](https://www.github.com/DJj123dj/apc-mini-mk2)
 
 ### Akai APC Mini Mk2
 An easy-to-use and feature-rich Node.js package for interacting with one or multiple Apc Mini's (Mk2) from Akai Professional.
@@ -31,6 +31,7 @@ npm install apc-mini-mk2
 - 🎯 **Input Polling** — Fetch the current state of sliders & buttons without events.
 - 🎬 **Startup Animations** — Display RGB animations while the device is connecting.
 - ✅ **Multi Platform** — Tested on MacOS & Windows. Linux is untested but should work.
+- 🛜 **Virtual Controllers** — Simulate virtual APC Mini controller connections.
 
 ## 📸 Examples
 > Images will be added to the README soon!
@@ -417,5 +418,5 @@ Converts X-Y coordinates to a pad index (0–63).
 ---
 <img src="https://apis.dj-dj.be/cdn/apc-mini-mk2/logo.png" alt="Apc Mini Mk2 Logo" width="130px">
 
-**v1.0.3 - README.md**<br>
+**v2.0.0 - README.md**<br>
 © 2026 - [DJdj Development](https://www.dj-dj.be) - [Discord](https://discord.dj-dj.be) - [Terms](https://www.dj-dj.be/terms) - [Privacy Policy](https://www.dj-dj.be/privacy) - [Support Us](https://github.com/sponsors/DJj123dj) - [License](./LICENSE.md)
