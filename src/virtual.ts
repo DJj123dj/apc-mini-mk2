@@ -163,7 +163,9 @@ export class APCMiniVirtualOutput extends EventEmitter {
             if (introductionMsg === incomingMsg && this.linkedInput){
                 //send back all initial slider values as 0
                 const sliderValues = [...this.linkedInput.initialSliderValues.values()]
-                this.linkedInput.emit("sysex",[0xF0,0x47,0x7F,0x4F,0x61,0x00,0x04,...sliderValues,0xF7])
+                this.linkedInput.emit("sysex",{
+                    bytes:[0xF0,0x47,0x7F,0x4F,0x61,0x00,0x04,...sliderValues,0xF7]
+                })
                 return
             }
         }
