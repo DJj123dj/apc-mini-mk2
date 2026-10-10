@@ -811,9 +811,10 @@ export class APCMiniController {
             const bytes: number[] = sysex.bytes
             if (bytes[4] !== 0x61) return
             if (!this.#sliderCache.has(id)) this.#sliderCache.set(id,new Map(new Array(9).fill(0).map((s,i) => ([i,s]))))
-            const controllerMap = this.#sliderCache.get(id)!
+            const sliderMap = this.#sliderCache.get(id)!
             bytes.slice(7,16).forEach((value,index) => {
-                controllerMap.set(index,value)
+                sliderMap.set(index,value)
+                this.#emit("sliderChanged",id,index,value)
             })
         })
         output.send("sysex",[0xF0,0x47,0x7F,0x4F,0x60,0x00,0x04,0x00,0x01,0x00,0x00,0xF7])
